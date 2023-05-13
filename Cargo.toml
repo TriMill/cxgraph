@@ -1,0 +1,16 @@
+[package]
+name = "wgpu_calc"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wgpu = "0.16"
+env_logger = "0.10"
+log = "0.4"
+pollster = "0.3"
+winit = "0.28"
+cgmath = "0.18"
+encase = { version = "0.6", features = ["cgmath"] }
+regex = "1.8"
