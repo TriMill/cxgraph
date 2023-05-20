@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cxgraph</title>
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+	<div id="main">
+		<div id="header">
+			<h1>CXGraph</h1>
+		</div>
+		<div id="content">
+			<div id="sidebar" class="split left">
+				<textarea id="srcinput"></textarea>
+			</div>
+			<div id="canvas_container" class="split right">
+			</div>
+		</div>
+	</div>
+	<script type="module">
+		import init, * as cxgraph from "./pkg/cxgraph.js";
+		await init();
+		await cxgraph.load_shader("plot(z) = z");
+		await cxgraph.redraw();
+		let canvas = document.getElementsByTagName("canvas")[0];
+		canvas.style.width = "100%";
+		canvas.style.height = "100%";
+
+		new ResizeObserver(async () => {
+			//console.log("resize");
+			//let width = canvas.clientWidth;
+			//let height = canvas.clientHeight;
+			//await cxgraph.resize(width, height);
+			//await cxgraph.redraw();
+		}).observe(canvas);
+	</script>
+</body>
+</html>

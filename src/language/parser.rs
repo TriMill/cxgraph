@@ -6,7 +6,8 @@ use super::{scanner::{Scanner, Token}, Position};
 
 #[derive(Clone, Debug)]
 pub enum ParseError<'s> {
-	UnexpectedTokenPrefix(Position, Token<'s>),
+	UnexpectedExpr(Position, Expr<'s>),
+	Unexpected(Position, Token<'s>),
 	Expected(Position, Token<'s>),
 	InvalidLValue(Position),
 	InvalidFunction(Expr<'s>),
@@ -31,10 +32,10 @@ impl BinaryOp {
 
 	pub const fn precedence(self) -> (u32, u32) {
 		match self {
-			BinaryOp::Add => (10, 11),
-			BinaryOp::Sub => (10, 11),
-			BinaryOp::Mul => (20, 21),
-			BinaryOp::Div => (20, 21),
+			BinaryOp::Add
+			| BinaryOp::Sub => (10, 11),
+			BinaryOp::Mul
+			| BinaryOp::Div => (20, 21),
 			BinaryOp::Pow => (31, 30),
 		}
 	}
@@ -65,16 +66,17 @@ impl UnaryOp {
 pub enum Expr<'s> {
 	Number(Complex),
 	Name(&'s str),
-	NameDeriv(&'s str, u32),
 	Unary(UnaryOp, Box<Expr<'s>>),
 	Binary(BinaryOp, Box<Expr<'s>>, Box<Expr<'s>>),
-	FnCall { name: &'s str, args: Vec<Expr<'s>>, nderiv: u32 },
+	FnCall(&'s str, Vec<Expr<'s>>),
 }
 
 #[derive(Debug)]
 pub enum Stmt<'s> {
-	AssignConst(&'s str, Expr<'s>),
-	AssignFunc(&'s str, Vec<&'s str>, Expr<'s>),
+	Const { name: &'s str, body: Expr<'s> },
+	Func { name: &'s str, args: Vec<&'s str>, body: Expr<'s> },
+	Deriv { name: &'s str, func: &'s str },
+	Iter { name: &'s str, func: &'s str, count: u32 }
 }
 
 pub struct Parser<'s> {
@@ -113,21 +115,13 @@ impl <'s> Parser<'s> {
 			tok => if let Some(op) = UnaryOp::from_token(tok) {
 				Expr::Unary(op, Box::new(self.expr(op.precedence())?))
 			} else {
-				return Err(ParseError::UnexpectedTokenPrefix(pos, tok))
+				return Err(ParseError::Unexpected(pos, tok))
 			}
 		};
 
 		while let Some((_, tok)) = self.scanner.peek() {
 			expr = match tok {
-				Token::Equal | Token::RParen | Token::Newline | Token::Comma => break,
-				Token::Quote => {
-					self.scanner.next();
-					match expr {
-						Expr::Name(name) => Expr::NameDeriv(name, 1),
-						Expr::NameDeriv(name, nderiv) => Expr::NameDeriv(name, nderiv+1),
-						_ => return Err(ParseError::InvalidFunction(expr))
-					}
-				},
+				Token::Equal | Token::Colon | Token::RParen | Token::Newline | Token::Comma => break,
 				Token::LParen => {
 					self.scanner.next();
 					let mut args = Vec::new();
@@ -142,8 +136,7 @@ impl <'s> Parser<'s> {
 					}
 					self.expect(Token::RParen)?;
 					match expr {
-						Expr::Name(name) => Expr::FnCall { name, args, nderiv: 0 },
-						Expr::NameDeriv(name, nderiv) => Expr::FnCall { name, args, nderiv },
+						Expr::Name(name) => Expr::FnCall(name, args),
 						_ => return Err(ParseError::InvalidFunction(expr)),
 					}
 				},
@@ -169,6 +162,70 @@ impl <'s> Parser<'s> {
 		Ok(expr)
 	}
 
+	pub fn parse_stmt_equals(&mut self, lhs_pos: Position, lhs: Expr<'s>) -> Result<Stmt<'s>, ParseError<'s>> {
+		if self.scanner.peek().is_none() {
+			return Err(ParseError::UnexpectedEof)
+		}
+
+		let rhs = self.expr(0)?;
+
+		if self.scanner.peek().is_some() {
+			self.expect(Token::Newline)?;
+		}
+
+		match lhs {
+			Expr::Name(name) => Ok(Stmt::Const { name, body: rhs }),
+			Expr::FnCall(name, args) => {
+				let mut arg_names = Vec::with_capacity(args.len());
+				for arg in args {
+					if let Expr::Name(name) = arg {
+						arg_names.push(name);
+					}
+				}
+				Ok(Stmt::Func { name, args: arg_names, body: rhs })
+			}
+			_ => return Err(ParseError::InvalidLValue(lhs_pos))
+		}
+	}
+
+	pub fn parse_stmt_deriv(&mut self, lhs_pos: Position, lhs: Expr<'s>) -> Result<Stmt<'s>, ParseError<'s>> {
+		if self.scanner.peek().is_none() {
+			return Err(ParseError::UnexpectedEof)
+		}
+		let pos = self.scanner.peek().unwrap().0;
+		let f = self.expr(0)?;
+		match (lhs, f) {
+			(Expr::Name(name), Expr::Name(func)) => Ok(Stmt::Deriv { name, func }),
+			(Expr::Name(_), f) => Err(ParseError::UnexpectedExpr(pos, f)),
+			(lhs, _) => Err(ParseError::UnexpectedExpr(lhs_pos, lhs)),
+		}
+	}
+
+	pub fn parse_stmt_iter(&mut self, lhs_pos: Position, lhs: Expr<'s>) -> Result<Stmt<'s>, ParseError<'s>> {
+		let Expr::Name(name) = lhs else {
+			return Err(ParseError::UnexpectedExpr(lhs_pos, lhs))
+		};
+		if self.scanner.peek().is_none() {
+			return Err(ParseError::UnexpectedEof)
+		}
+		let pos = self.scanner.peek().unwrap().0;
+		let func = self.expr(0)?;
+		let Expr::Name(func) = func else {
+			return Err(ParseError::UnexpectedExpr(pos, func))
+		};
+		self.expect(Token::Comma)?;
+		if self.scanner.peek().is_none() {
+			return Err(ParseError::UnexpectedEof)
+		}
+		let pos = self.scanner.peek().unwrap().0;
+		let count = self.expr(0)?;
+		let Expr::Number(count) = count else {
+			return Err(ParseError::UnexpectedExpr(pos, count))
+		};
+		Ok(Stmt::Iter { name, func, count: count.re as u32 })
+
+	}
+
 	pub fn parse(&mut self) -> Result<Vec<Stmt<'s>>, ParseError<'s>> {
 		let mut stmts = Vec::new();
 		while self.scanner.peek().is_some() {
@@ -183,30 +240,16 @@ impl <'s> Parser<'s> {
 			let lhs_pos = self.scanner.peek().unwrap().0;
 			let lhs = self.expr(0)?;
 
-			self.expect(Token::Equal)?;
-
-			if self.scanner.peek().is_none() {
-				return Err(ParseError::UnexpectedEof)
-			}
-
-			let rhs = self.expr(0)?;
-
-			if self.scanner.peek().is_some() {
-				self.expect(Token::Newline)?;
-			}
-
-			let stmt = match lhs {
-				Expr::Name(name) => Stmt::AssignConst(name, rhs),
-				Expr::FnCall { name, args, nderiv: 0 } => {
-					let mut arg_names = Vec::with_capacity(args.len());
-					for arg in args {
-						if let Expr::Name(name) = arg {
-							arg_names.push(name)
-						}
-					}
-					Stmt::AssignFunc(name, arg_names, rhs)
+			let stmt = match self.scanner.next() {
+				Some((_, Token::Equal)) => self.parse_stmt_equals(lhs_pos, lhs)?,
+				Some((_, Token::Colon)) => match self.scanner.next() {
+					Some((_, Token::Name("deriv"))) => self.parse_stmt_deriv(lhs_pos, lhs)?,
+					Some((_, Token::Name("iter"))) => self.parse_stmt_iter(lhs_pos, lhs)?,
+					Some((pos, tok)) => return Err(ParseError::Unexpected(pos, tok)),
+					None => return Err(ParseError::UnexpectedEof),
 				}
-				_ => return Err(ParseError::InvalidLValue(lhs_pos))
+				Some((pos, tok)) => return Err(ParseError::Unexpected(pos, tok)),
+				None => return Err(ParseError::UnexpectedEof),
 			};
 
 			stmts.push(stmt);

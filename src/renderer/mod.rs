@@ -2,36 +2,36 @@ use std::num::NonZeroU64;
 
 use encase::{ShaderType, ShaderSize, UniformBuffer};
 use wgpu::util::DeviceExt;
-use winit::{event_loop::EventLoop, window::Window, event::{Event, WindowEvent}, dpi::PhysicalSize};
 
 type Vec2u = cgmath::Vector2<u32>;
 type Vec2f = cgmath::Vector2<f32>;
 
 #[derive(ShaderType)]
 struct Uniforms {
-	resolution: Vec2u,
-	bounds_min: Vec2f,
-	bounds_max: Vec2f,
-	shading_intensity: f32,
+	pub resolution: Vec2u,
+	pub bounds_min: Vec2f,
+	pub bounds_max: Vec2f,
+	pub shading_intensity: f32,
 }
 
-struct State {
+pub struct WgpuState {
+	uniforms: Uniforms,
 	surface: wgpu::Surface,
 	device: wgpu::Device,
 	config: wgpu::SurfaceConfiguration,
 	render_pipeline: Option<wgpu::RenderPipeline>,
 	uniform_bind_group: wgpu::BindGroup,
-	uniform_bind_group_layout: wgpu::BindGroupLayout,
+	uniform_layout: wgpu::BindGroupLayout,
 	uniform_buffer: wgpu::Buffer,
-	queue: wgpu::Queue,
+	queue: wgpu::Queue
 }
 
-impl State {
-	async fn new(window: &Window) -> Self {
-		let size = window.inner_size();
+impl WgpuState {
+	pub async fn new<W>(window: &W, size: (u32, u32)) -> Self
+	where W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle {
 
 		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
-		let surface = unsafe { instance.create_surface(&window) }.unwrap();
+        let surface = unsafe { instance.create_surface(&window) }.unwrap();
 
 		let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
 			power_preference: wgpu::PowerPreference::default(),
@@ -43,19 +43,19 @@ impl State {
 			&wgpu::DeviceDescriptor {
 				label: None,
 				features: wgpu::Features::empty(),
-				limits: wgpu::Limits::default(),
+				limits: wgpu::Limits::downlevel_webgl2_defaults(),
 			},
 			None
-		).await.unwrap();
+		).await.map_err(|e| e.to_string()).unwrap();
 
 		let format = surface.get_capabilities(&adapter).formats[0];
 
 		let config = wgpu::SurfaceConfiguration {
 			usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
 			format,
-			width: size.width,
-			height: size.height,
-			present_mode: wgpu::PresentMode::Mailbox,
+			width: size.0,
+			height: size.1,
+			present_mode: wgpu::PresentMode::Fifo,
 			alpha_mode: wgpu::CompositeAlphaMode::Auto,
 			view_formats: vec![format],
 		};
@@ -69,7 +69,7 @@ impl State {
 			contents: &[0; Uniforms::SHADER_SIZE.get() as usize],
 		});
 
-		let uniform_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+		let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 			label: None,
 			entries: &[
 				wgpu::BindGroupLayoutEntry {
@@ -87,7 +87,7 @@ impl State {
 
 		let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
 			label: None,
-			layout: &uniform_bind_group_layout,
+			layout: &uniform_layout,
 			entries: &[
 				wgpu::BindGroupEntry {
 					binding: 1,
@@ -102,19 +102,27 @@ impl State {
 
 		//  Done  //
 
+        let uniforms = Uniforms {
+            resolution: size.into(),
+            bounds_min: [-0.0, -0.0].into(),
+            bounds_max: [ 0.0,  0.0].into(),
+            shading_intensity: 0.0,
+        };
+
 		Self {
+			uniforms,
 			surface,
-			device,
 			config,
+			device,
 			render_pipeline: None,
-			queue,
 			uniform_bind_group,
-			uniform_bind_group_layout,
+			uniform_layout,
 			uniform_buffer,
+			queue,
 		}
 	}
 
-	fn load_shaders(&mut self, userdefs: &str) {
+	pub fn load_shaders(&mut self, userdefs: &str) {
 		//  Shaders  //
 		let src = include_str!("shader.wgsl");
 		let src = src.replace("//INCLUDE//\n", userdefs);
@@ -147,7 +155,7 @@ impl State {
 
 		let pipeline_layout = self.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&self.uniform_bind_group_layout],
+            bind_group_layouts: &[&self.uniform_layout],
             push_constant_ranges: &[],
         });
 
@@ -165,7 +173,7 @@ impl State {
 		self.render_pipeline = Some(render_pipeline);
 	}
 
-	fn redraw(&self, uniforms: &Uniforms) {
+	pub fn redraw(&self) {
 		let frame = self.surface.get_current_texture().unwrap();
 		let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
 		let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -192,45 +200,26 @@ impl State {
 			}
 		}
 		let mut uniform_buffer = UniformBuffer::new([0; Uniforms::SHADER_SIZE.get() as usize]);
-		uniform_buffer.write(uniforms).unwrap();
+		uniform_buffer.write(&self.uniforms).unwrap();
 		self.queue.write_buffer(&self.uniform_buffer, 0, &uniform_buffer.into_inner());
 		self.queue.submit(Some(encoder.finish()));
 		frame.present();
 	}
 
-	fn resize(&mut self, size: PhysicalSize<u32>) {
-		self.config.width = size.width;
-		self.config.height = size.height;
+	pub fn resize(&mut self, size: (u32, u32)) {
+		let size = (size.0.max(1).min(2048), size.1.max(1).min(2048));
+		self.config.width = size.0;
+		self.config.height = size.1;
 		self.surface.configure(&self.device, &self.config);
+		self.uniforms.resolution = size.into();
 	}
-}
 
-pub async fn run(event_loop: EventLoop<()>, window: Window, code: &str) {
-	let mut state = State::new(&window).await;
-	state.load_shaders(code);
-	let mut uniforms = Uniforms {
-		resolution: [window.inner_size().width, window.inner_size().height].into(),
-		bounds_min: [0.73, 0.65].into(),
-		bounds_max: [0.98, 0.9].into(),
-		shading_intensity: 0.001,
-	};
+	pub fn set_bounds(&mut self, min: (f32, f32), max: (f32, f32)) {
+		self.uniforms.bounds_min = min.into();
+		self.uniforms.bounds_max = max.into();
+	}
 
-	event_loop.run(move |event, _, control_flow| {
-		control_flow.set_wait();
-		match event {
-			Event::WindowEvent { event: WindowEvent::CloseRequested, .. }
-				=> control_flow.set_exit(),
-			Event::RedrawRequested(_)
-				=> state.redraw(&uniforms),
-			Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-				uniforms.resolution = [size.width, size.height].into();
-				state.resize(size);
-				window.request_redraw()
-			}
-			Event::MainEventsCleared => {
-				//window.request_redraw();
-			}
-			_ => (),
-		}
-	});
+	pub fn set_shading_intensity(&mut self, value: f32) {
+		self.uniforms.shading_intensity = value;
+	}
 }

@@ -1,26 +1,48 @@
-use language::compile;
-use renderer::run;
-use winit::{event_loop::EventLoop, window::Window};
 
-mod language;
-mod renderer;
-mod complex;
+use cxgraph::{renderer::WgpuState, language::compile};
+use winit::{event_loop::EventLoop, window::Window, event::{Event, WindowEvent}};
 
 fn main() {
-	env_logger::init();
+	env_logger::builder()
+		.filter_level(log::LevelFilter::Info)
+		.init();
 
 	let src = r#"
-		f(z,a,b,c) = (z-a)*(z-b)*(z-c)
-		g(z,a,b,c) = z - f(z,a,b,c)/f'(z,a,b,c)
-		plot(z) = iter4(g, 50, z/3, z, 1, -1)
+		f(z, c) = z^2 + c
+		g: iter f, 100
+		plot(z) = g(z, z)
 	"#;
 	let wgsl = compile(src).unwrap();
-	println!("{}", wgsl);
+	println!("{wgsl}");
 
 	let event_loop = EventLoop::new();
 	let window = Window::new(&event_loop).unwrap();
 	window.set_title("window");
 
 	pollster::block_on(run(event_loop, window, &wgsl));
+}
 
+async fn run(event_loop: EventLoop<()>, window: Window, code: &str) {
+    let size = window.inner_size();
+	let mut state = WgpuState::new(&window, size.into()).await;
+
+	state.load_shaders(code);
+
+	state.set_bounds((-5.0, -5.0), (5.0, 5.0));
+	state.set_shading_intensity(0.01);
+
+	event_loop.run(move |event, _, control_flow| {
+		control_flow.set_wait();
+		match event {
+			Event::WindowEvent { event: WindowEvent::CloseRequested, .. }
+				=> control_flow.set_exit(),
+			Event::RedrawRequested(_)
+				=> state.redraw(),
+			Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
+				state.resize(size.into());
+				window.request_redraw();
+			}
+			_ => (),
+		}
+	});
 }

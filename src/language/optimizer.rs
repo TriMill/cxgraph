@@ -20,10 +20,11 @@ fn apply_binary(op: BinaryOp, u: Complex, v: Complex) -> Complex {
 	}
 }
 
-pub fn optimize<'s>(stmts: Vec<Stmt<'s>>) -> Vec<Stmt<'s>> {
+pub fn optimize(stmts: Vec<Stmt>) -> Vec<Stmt> {
 	stmts.into_iter().map(|s| match s {
-		Stmt::AssignConst(a, expr) => Stmt::AssignConst(a, optimize_expr(expr)),
-		Stmt::AssignFunc(a, b, expr) => Stmt::AssignFunc(a, b, optimize_expr(expr)),
+		Stmt::Const { name, body } => Stmt::Const { name, body: optimize_expr(body) },
+		Stmt::Func { name, args, body } => Stmt::Func { name, args, body: optimize_expr(body) },
+		_ => s,
 	}).collect()
 }
 
@@ -41,17 +42,16 @@ fn optimize_expr<'s>(e: Expr<'s>) -> Expr<'s> {
 				(u, v) => Expr::Binary(op, Box::new(u), Box::new(v))
 			}
 		},
-		Expr::FnCall { name, args, nderiv } => {
-			let args: Vec<Expr<'s>> = args.into_iter().map(|a| optimize_expr(a)).collect();
+		Expr::FnCall(name, args) => {
+			let args: Vec<Expr<'s>> = args.into_iter().map(optimize_expr).collect();
 			if let Some((_, Type::Function(argc), Some(func))) = BUILTINS.with(|m| m.get(name).copied()) {
-				if argc as usize == args.len() && nderiv == 0 {
-					if args.iter().all(|e| matches!(e, Expr::Number(_))) {
-						let ns: Vec<Complex> = args.into_iter().map(|a| match a { Expr::Number(n) => n, _ => unreachable!() }).collect();
-						return Expr::Number(func(&ns))
-					}
+				if argc as usize == args.len()
+				&& args.iter().all(|e| matches!(e, Expr::Number(_))) {
+					let ns: Vec<Complex> = args.into_iter().map(|a| match a { Expr::Number(n) => n, _ => unreachable!() }).collect();
+					return Expr::Number(func(&ns))
 				}
 			}
-			Expr::FnCall { name, args, nderiv }
+			Expr::FnCall(name, args)
 		}
 		Expr::Name(name) => {
 			if let Some((_, Type::Number, Some(func))) = BUILTINS.with(|m| m.get(name).copied()) {
@@ -60,6 +60,6 @@ fn optimize_expr<'s>(e: Expr<'s>) -> Expr<'s> {
 				e
 			}
 		}
-		_ => e,
+		Expr::Number(_) => e,
 	}
 }
