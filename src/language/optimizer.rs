@@ -1,6 +1,6 @@
 use crate::complex::{Complex, cxfn};
 
-use super::{parser::{Expr, UnaryOp, BinaryOp, Stmt}, compiler::{BUILTINS, Type}};
+use super::{parser::{Expr, UnaryOp, BinaryOp, Stmt, Defn}, compiler::{BUILTINS, Type}};
 
 fn apply_unary(op: UnaryOp, arg: Complex) -> Complex {
 	match op {
@@ -20,12 +20,27 @@ fn apply_binary(op: BinaryOp, u: Complex, v: Complex) -> Complex {
 	}
 }
 
-pub fn optimize(stmts: Vec<Stmt>) -> Vec<Stmt> {
-	stmts.into_iter().map(|s| match s {
-		Stmt::Const { name, body } => Stmt::Const { name, body: optimize_expr(body) },
-		Stmt::Func { name, args, body } => Stmt::Func { name, args, body: optimize_expr(body) },
+pub fn optimize(defns: Vec<Defn>) -> Vec<Defn> {
+	defns.into_iter().map(|s| match s {
+		Defn::Const { name, body } => Defn::Const { name, body: optimize_expr(body) },
+		Defn::Func { name, args, body } => {
+			let stmts = body.0.into_iter()
+				.map(optimize_stmt).collect();
+			let expr = optimize_expr(body.1);
+			Defn::Func { name, args, body: (stmts, expr) }
+		}
 		_ => s,
 	}).collect()
+}
+
+fn optimize_stmt(stmt: Stmt) -> Stmt {
+	match stmt {
+		Stmt::Expr(e) => Stmt::Expr(optimize_expr(e)),
+		Stmt::Store(v, e) => Stmt::Store(v, optimize_expr(e)),
+		Stmt::Iter(v, min, max, stmts) => Stmt::Iter(v, min, max,
+			stmts.into_iter().map(optimize_stmt).collect()
+		)
+	}
 }
 
 fn optimize_expr<'s>(e: Expr<'s>) -> Expr<'s> {

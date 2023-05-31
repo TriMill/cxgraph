@@ -190,16 +190,22 @@ fn shademap(r: f32) -> f32 {
     return r*inverseSqrt(r * r + 0.0625 * uniforms.shading_intensity)*0.9875 + 0.0125;
 }
 
-@fragment
-fn fs_main(@builtin(position) in: vec4f) -> @location(0) vec4f {
-	let pos = vec2(in.x, f32(uniforms.resolution.y) - in.y);
-	var z = remap(pos, vec2(0.0), vec2f(uniforms.resolution), uniforms.bounds_min, uniforms.bounds_max);
-
-	z = func_plot(z);
+fn colorfor(w: vec2f) -> vec3f {
+	let z = func_plot(w);
 
 	let r = sqrt(z.x*z.x + z.y*z.y);
 	let arg = atan2(z.y, z.x);
 	let hsv = vec3f(arg / TAU + 1.0, shademap(1.0/r), shademap(r));
-	let col = pow(hsv2rgb(hsv), vec3(2.0));
+	return pow(hsv2rgb(hsv), vec3(2.0));
+}
+
+@fragment
+fn fs_main(@builtin(position) in: vec4f) -> @location(0) vec4f {
+	let pos = vec2(in.x, f32(uniforms.resolution.y) - in.y);
+	let z = remap(pos, vec2(0.0), vec2f(uniforms.resolution), uniforms.bounds_min, uniforms.bounds_max);
+	//let dz = z - remap(pos + vec2f(1.0), vec2(0.0), vec2f(uniforms.resolution), uniforms.bounds_min, uniforms.bounds_max);
+
+	let col = colorfor(z);
+
 	return vec4f(col, 1.0);
 }

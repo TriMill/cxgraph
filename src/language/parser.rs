@@ -5,14 +5,11 @@ use crate::complex::Complex;
 use super::{scanner::{Scanner, Token}, Position};
 
 #[derive(Clone, Debug)]
-pub enum ParseError<'s> {
-	UnexpectedExpr(Position, Expr<'s>),
-	Unexpected(Position, Token<'s>),
-	Expected(Position, Token<'s>),
-	InvalidLValue(Position),
-	InvalidFunction(Expr<'s>),
-	UnexpectedEof,
+pub struct ParseError {
+	msg: String,
+	pos: Option<Position>,
 }
+
 #[derive(Debug, Clone, Copy)]
 pub enum BinaryOp {
 	Add, Sub, Mul, Div, Pow,
@@ -73,10 +70,14 @@ pub enum Expr<'s> {
 
 #[derive(Debug)]
 pub enum Stmt<'s> {
+	Expr(Expr<'s>),
+	Store(&'s str, Expr<'s>),
+	Iter(&'s str, u32, u32, Vec<Stmt<'s>>),
+}
+
+pub enum Defn<'s> {
 	Const { name: &'s str, body: Expr<'s> },
-	Func { name: &'s str, args: Vec<&'s str>, body: Expr<'s> },
-	Deriv { name: &'s str, func: &'s str },
-	Iter { name: &'s str, func: &'s str, count: u32 }
+	Func { name: &'s str, args: Vec<&'s str>, body: (Vec<Stmt<'s>>, Expr<'s>) },
 }
 
 pub struct Parser<'s> {
@@ -90,20 +91,46 @@ impl <'s> Parser<'s> {
 		}
 	}
 
-	fn expect(&mut self, tok: Token<'s>) -> Result<Position, ParseError<'s>> {
-		match self.scanner.peek() {
-			Some((p, t)) if *t == tok => {
-				let p = *p;
-				self.scanner.next();
-				Ok(p)
-			},
-			Some((p, _)) => Err(ParseError::Expected(*p, tok)),
-			None => Err(ParseError::UnexpectedEof),
+	fn next(&mut self) -> Result<(Position, Token<'s>), ParseError> {
+		match self.scanner.next() {
+			Some(r) => Ok(r),
+			None => Err(self.err_here("Unexpected EOF")),
 		}
 	}
 
-	fn expr(&mut self, min_prec: u32) -> Result<Expr<'s>, ParseError<'s>> {
-		let (pos, tok) = self.scanner.next().unwrap();
+	fn peek(&mut self) -> Result<(Position, Token<'s>), ParseError> {
+		match self.scanner.peek() {
+			Some(r) => Ok(*r),
+			None => Err(self.err_here("Unexpected EOF")),
+		}
+	}
+
+	fn at_end(&mut self) -> bool {
+		self.scanner.peek().is_none()
+	}
+
+	fn expect(&mut self, tok: Token<'s>) -> Result<Position, ParseError> {
+		match self.peek()? {
+			(p, t) if t == tok => {
+				self.next()?;
+				Ok(p)
+			},
+			(p, t) => Err(self.err_at(format!("Unexpected token {t:?}, expected {tok:?}"), p)),
+		}
+	}
+
+	fn err_here<S>(&mut self, msg: S) -> ParseError
+	where S: Into<String> {
+		ParseError { msg: msg.into(), pos: self.peek().map(|(p,_)| p).ok() }
+	}
+
+	fn err_at<S>(&mut self, msg: S, pos: Position) -> ParseError
+	where S: Into<String> {
+		ParseError { msg: msg.into(), pos: Some(pos) }
+	}
+
+	fn expr(&mut self, min_prec: u32) -> Result<Expr<'s>, ParseError> {
+		let (pos, tok) = self.next()?;
 		let mut expr = match tok {
 			Token::Number(n) => Expr::Number(Complex::from(n)),
 			Token::Name(n) => Expr::Name(n),
@@ -115,37 +142,38 @@ impl <'s> Parser<'s> {
 			tok => if let Some(op) = UnaryOp::from_token(tok) {
 				Expr::Unary(op, Box::new(self.expr(op.precedence())?))
 			} else {
-				return Err(ParseError::Unexpected(pos, tok))
+				return Err(self.err_at(format!("Unexpected token {:?}", tok), pos))
 			}
 		};
 
-		while let Some((_, tok)) = self.scanner.peek() {
+		while let Ok((_, tok)) = self.peek() {
+			if is_closing(&tok) {
+				break;
+			}
 			expr = match tok {
-				Token::Equal | Token::Colon | Token::RParen | Token::Newline | Token::Comma => break,
 				Token::LParen => {
-					self.scanner.next();
+					self.next()?;
 					let mut args = Vec::new();
-					while !matches!(self.scanner.peek(), None | Some((_, Token::RParen))) {
+					while !matches!(self.peek(), Err(_) | Ok((_, Token::RParen))) {
 						args.push(self.expr(0)?);
-						match self.scanner.peek() {
-							Some((_, Token::Comma)) => { self.scanner.next(); },
-							Some((_, Token::RParen)) => break,
-							Some((pos, _)) => return Err(ParseError::Expected(*pos, Token::RParen)),
-							None => return Err(ParseError::UnexpectedEof),
+						match self.peek()?.1 {
+							Token::Comma => { self.next()?; },
+							Token::RParen => break,
+							_ => return Err(self.err_here(format!("Unexpected token {:?}, expected ',' or ')'", tok)))
 						}
 					}
 					self.expect(Token::RParen)?;
 					match expr {
 						Expr::Name(name) => Expr::FnCall(name, args),
-						_ => return Err(ParseError::InvalidFunction(expr)),
+						_ => return Err(self.err_here("Cannot call this expression"))
 					}
 				},
-				tok => if let Some(op) = BinaryOp::from_token(*tok) {
+				tok => if let Some(op) = BinaryOp::from_token(tok) {
 					let (lp, rp) = op.precedence();
 					if lp < min_prec {
 						break;
 					}
-					self.scanner.next();
+					self.next()?;
 					let rhs = self.expr(rp)?;
 					Expr::Binary(op, Box::new(expr), Box::new(rhs))
 				} else {
@@ -162,98 +190,83 @@ impl <'s> Parser<'s> {
 		Ok(expr)
 	}
 
-	pub fn parse_stmt_equals(&mut self, lhs_pos: Position, lhs: Expr<'s>) -> Result<Stmt<'s>, ParseError<'s>> {
-		if self.scanner.peek().is_none() {
-			return Err(ParseError::UnexpectedEof)
-		}
-
-		let rhs = self.expr(0)?;
-
-		if self.scanner.peek().is_some() {
-			self.expect(Token::Newline)?;
-		}
-
-		match lhs {
-			Expr::Name(name) => Ok(Stmt::Const { name, body: rhs }),
-			Expr::FnCall(name, args) => {
-				let mut arg_names = Vec::with_capacity(args.len());
-				for arg in args {
-					if let Expr::Name(name) = arg {
-						arg_names.push(name);
-					}
-				}
-				Ok(Stmt::Func { name, args: arg_names, body: rhs })
+	fn stmt(&mut self) -> Result<Stmt<'s>, ParseError> {
+		let expr = self.expr(0)?;
+		match self.peek()?.1 {
+			Token::Arrow => {
+				self.next()?;
+				let name = match self.next()? {
+					(_, Token::Name(name)) => name,
+					(p, t) => return Err(self.err_at(format!("Unexpected token {t:?}, expected a name"), p))
+				};
+				Ok(Stmt::Store(name, expr))
 			}
-			_ => return Err(ParseError::InvalidLValue(lhs_pos))
+			_ => Ok(Stmt::Expr(expr))
 		}
 	}
 
-	pub fn parse_stmt_deriv(&mut self, lhs_pos: Position, lhs: Expr<'s>) -> Result<Stmt<'s>, ParseError<'s>> {
-		if self.scanner.peek().is_none() {
-			return Err(ParseError::UnexpectedEof)
-		}
-		let pos = self.scanner.peek().unwrap().0;
-		let f = self.expr(0)?;
-		match (lhs, f) {
-			(Expr::Name(name), Expr::Name(func)) => Ok(Stmt::Deriv { name, func }),
-			(Expr::Name(_), f) => Err(ParseError::UnexpectedExpr(pos, f)),
-			(lhs, _) => Err(ParseError::UnexpectedExpr(lhs_pos, lhs)),
-		}
-	}
-
-	pub fn parse_stmt_iter(&mut self, lhs_pos: Position, lhs: Expr<'s>) -> Result<Stmt<'s>, ParseError<'s>> {
-		let Expr::Name(name) = lhs else {
-			return Err(ParseError::UnexpectedExpr(lhs_pos, lhs))
-		};
-		if self.scanner.peek().is_none() {
-			return Err(ParseError::UnexpectedEof)
-		}
-		let pos = self.scanner.peek().unwrap().0;
-		let func = self.expr(0)?;
-		let Expr::Name(func) = func else {
-			return Err(ParseError::UnexpectedExpr(pos, func))
-		};
-		self.expect(Token::Comma)?;
-		if self.scanner.peek().is_none() {
-			return Err(ParseError::UnexpectedEof)
-		}
-		let pos = self.scanner.peek().unwrap().0;
-		let count = self.expr(0)?;
-		let Expr::Number(count) = count else {
-			return Err(ParseError::UnexpectedExpr(pos, count))
-		};
-		Ok(Stmt::Iter { name, func, count: count.re as u32 })
-
-	}
-
-	pub fn parse(&mut self) -> Result<Vec<Stmt<'s>>, ParseError<'s>> {
+	fn stmts(&mut self) -> Result<Vec<Stmt<'s>>, ParseError> {
 		let mut stmts = Vec::new();
-		while self.scanner.peek().is_some() {
-			while matches!(self.scanner.peek(), Some((_, Token::Newline))) {
-				self.scanner.next();
+		loop {
+			stmts.push(self.stmt()?);
+			if !matches!(self.peek(), Ok((_, Token::Comma))) {
+				break
 			}
-
-			if self.scanner.peek().is_none() {
-				break;
-			}
-
-			let lhs_pos = self.scanner.peek().unwrap().0;
-			let lhs = self.expr(0)?;
-
-			let stmt = match self.scanner.next() {
-				Some((_, Token::Equal)) => self.parse_stmt_equals(lhs_pos, lhs)?,
-				Some((_, Token::Colon)) => match self.scanner.next() {
-					Some((_, Token::Name("deriv"))) => self.parse_stmt_deriv(lhs_pos, lhs)?,
-					Some((_, Token::Name("iter"))) => self.parse_stmt_iter(lhs_pos, lhs)?,
-					Some((pos, tok)) => return Err(ParseError::Unexpected(pos, tok)),
-					None => return Err(ParseError::UnexpectedEof),
-				}
-				Some((pos, tok)) => return Err(ParseError::Unexpected(pos, tok)),
-				None => return Err(ParseError::UnexpectedEof),
-			};
-
-			stmts.push(stmt);
+			self.next()?;
 		}
 		Ok(stmts)
 	}
+
+	pub fn parse(&mut self) -> Result<Vec<Defn<'s>>, ParseError> {
+		println!("parse");
+		let mut defns = Vec::new();
+		while self.peek().is_ok() {
+			println!("parse loop");
+			while matches!(self.peek(), Ok((_, Token::Newline))) {
+				self.next()?;
+			}
+
+			if self.peek().is_err() {
+				break;
+			}
+
+			let lhspos = self.peek()?.0;
+			let lhs = self.expr(0)?;
+
+			self.expect(Token::Equal)?;
+
+			let defn = match lhs {
+				Expr::Name(name) => {
+					let rhs = self.expr(0)?;
+					Defn::Const { name, body: rhs }
+				},
+				Expr::FnCall(name, args) => {
+					let mut rhs = self.stmts()?;
+					let last = rhs.pop().ok_or(self.err_here("Empty function body"))?;
+					let Stmt::Expr(last) = last else {
+						return Err(self.err_here("Last statement in function body must be a plain expression"))
+					};
+					let args = args.iter()
+						.map(|a| match a {
+							Expr::Name(n) => Ok(*n),
+							_ => Err(self.err_at("Invalid function declaration", lhspos))
+						}).collect::<Result<Vec<&str>, ParseError>>()?;
+					Defn::Func { name, args, body: (rhs, last) }
+				},
+				_ => return Err(self.err_at("Invalid lvalue, expected a name or function call", lhspos)),
+			};
+
+			defns.push(defn);
+
+			if self.at_end() {
+				break
+			}
+			self.expect(Token::Newline)?;
+		}
+		Ok(defns)
+	}
+}
+
+fn is_closing(tok: &Token) -> bool {
+	matches!(tok, Token::Equal | Token::RParen | Token::Newline | Token::Comma | Token::Arrow)
 }

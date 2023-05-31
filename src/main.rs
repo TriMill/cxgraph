@@ -8,9 +8,7 @@ fn main() {
 		.init();
 
 	let src = r#"
-		f(z, c) = z^2 + c
-		g: iter f, 100
-		plot(z) = g(z, z)
+        plot(z) = z^2 -> w, z*w
 	"#;
 	let wgsl = compile(src).unwrap();
 	println!("{wgsl}");

@@ -207,7 +207,7 @@ impl WgpuState {
 	}
 
 	pub fn resize(&mut self, size: (u32, u32)) {
-		let size = (size.0.max(1).min(2048), size.1.max(1).min(2048));
+		let size = (size.0.max(1).min(8192), size.1.max(1).min(8192));
 		self.config.width = size.0;
 		self.config.height = size.1;
 		self.surface.configure(&self.device, &self.config);

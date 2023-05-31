@@ -16,24 +16,25 @@
 				<textarea id="srcinput"></textarea>
 			</div>
 			<div id="canvas_container" class="split right">
+				<!-- canvas -->
 			</div>
 		</div>
 	</div>
 	<script type="module">
 		import init, * as cxgraph from "./pkg/cxgraph.js";
 		await init();
-		await cxgraph.load_shader("plot(z) = z");
-		await cxgraph.redraw();
-		let canvas = document.getElementsByTagName("canvas")[0];
 		canvas.style.width = "100%";
 		canvas.style.height = "100%";
+		await cxgraph.load_shader("f(z) = z^8 + 15z^4 - 16\nfp(z) = 8z^7 + 60z^3\nn(z) = z - f(z)/fp(z)\nni: iter n, 60\nplot(z) = f(z)");
+		await cxgraph.redraw();
+		let canvas = document.getElementsByTagName("canvas")[0];
 
 		new ResizeObserver(async () => {
-			//console.log("resize");
-			//let width = canvas.clientWidth;
-			//let height = canvas.clientHeight;
-			//await cxgraph.resize(width, height);
-			//await cxgraph.redraw();
+			let width = canvas.clientWidth;
+			let height = canvas.clientHeight;
+			await cxgraph.resize(width*2, height*2);
+			await cxgraph.set_bounds(-5*width/height, -5, 5*width/height, 5);
+			await cxgraph.redraw();
 		}).observe(canvas);
 	</script>
 </body>

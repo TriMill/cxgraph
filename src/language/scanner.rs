@@ -14,7 +14,7 @@ pub enum Token<'s> {
 	Caret,
 	Equal,
 	Comma,
-	Colon,
+	Arrow,
 	LParen,
 	RParen,
 	Newline,
@@ -90,11 +90,13 @@ impl <'s> Scanner<'s> {
 		let tok = match self.next().unwrap() {
 			'\n' => Token::Newline,
 			'+' => Token::Plus,
-			'-' => Token::Minus,
+			'-' => match self.peek().unwrap() {
+				'>' => { self.next(); Token::Arrow },
+				_ => Token::Minus,
+			}
 			'*' => Token::Star,
 			'/' => Token::Slash,
 			'^' => Token::Caret,
-			':' => Token::Colon,
 			'=' => Token::Equal,
 			',' => Token::Comma,
 			'(' => Token::LParen,

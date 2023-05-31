@@ -26,7 +26,7 @@ pub async fn start() {
 	let event_loop = EventLoop::new();
 	let window = Window::new(&event_loop).unwrap();
 
-	window.set_inner_size(PhysicalSize::new(1200, 1200));
+	window.set_inner_size(PhysicalSize::new(100, 100));
 	web_sys::window()
 		.and_then(|win| win.document())
 		.and_then(|doc| {

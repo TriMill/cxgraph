@@ -17,7 +17,7 @@ pub struct Position {
 
 #[derive(Clone, Debug)]
 pub enum Error<'s> {
-	Parse(ParseError<'s>),
+	Parse(ParseError),
 	Compile(CompileError<'s>),
 }
 
@@ -27,16 +27,19 @@ impl <'s> From<CompileError<'s>> for Error<'s> {
     }
 }
 
-impl <'s> From<ParseError<'s>> for Error<'s> {
-    fn from(value: ParseError<'s>) -> Self {
+impl <'s> From<ParseError> for Error<'s> {
+    fn from(value: ParseError) -> Self {
         Self::Parse(value)
     }
 }
 
 pub fn compile(src: &str) -> Result<String, Error> {
 	let mut buf = String::new();
-	let stmts = parser::Parser::new(src).parse()?;
-	let stmts = optimize(stmts);
-	compiler::compile(&mut buf, &stmts)?;
+	println!("parsing");
+	let defns = parser::Parser::new(src).parse()?;
+	println!("optimizing");
+	let defns = optimize(defns);
+	println!("compiling");
+	compiler::compile(&mut buf, &defns)?;
 	Ok(buf)
 }

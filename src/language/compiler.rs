@@ -2,7 +2,7 @@ use std::{collections::{HashMap, HashSet}, fmt::Write};
 
 use crate::complex::{Complex, cxfn};
 
-use super::parser::{Expr, Stmt, UnaryOp, BinaryOp};
+use super::parser::{Expr, Stmt, UnaryOp, BinaryOp, Defn};
 
 #[derive(Clone, Debug)]
 pub enum CompileError<'s> {
@@ -85,10 +85,10 @@ type LocalTable<'s> = HashSet<&'s str>;
 
 type CompileResult<'s,T=()> = Result<T, CompileError<'s>>;
 
-pub fn compile<'s>(buf: &mut impl Write, stmts: &[Stmt<'s>]) -> CompileResult<'s> {
+pub fn compile<'s>(buf: &mut impl Write, defns: &[Defn<'s>]) -> CompileResult<'s> {
 	let mut compiler = Compiler::new(buf);
-	for stmt in stmts {
-		compiler.compile_stmt(stmt)?;
+	for defn in defns {
+		compiler.compile_defn(defn)?;
 	}
 	Ok(())
 }
@@ -110,18 +110,16 @@ impl <'s, 'w, W: Write> Compiler<'s, 'w, W> {
 	//  Statements  //
 	//////////////////
 
-    fn compile_stmt(&mut self, stmt: &Stmt<'s>) -> CompileResult<'s> {
-        let res = match stmt {
-            Stmt::Const { name, body } => self.stmt_const(name, body),
-            Stmt::Func { name, args, body } => self.stmt_func(name, args, body),
-            Stmt::Deriv { name, func } => self.stmt_deriv(name, func),
-            Stmt::Iter { name, func, count } => self.stmt_iter(name, func, *count),
+    fn compile_defn(&mut self, defn: &Defn<'s>) -> CompileResult<'s> {
+        let res = match defn {
+            Defn::Const { name, body } => self.defn_const(name, body),
+            Defn::Func { name, args, body } => self.defn_func(name, args, body),
         };
 		writeln!(self.buf)?;
 		res
     }
 
-	fn stmt_const(&mut self, name: &'s str, body: &Expr<'s>) -> CompileResult<'s> {
+	fn defn_const(&mut self, name: &'s str, body: &Expr<'s>) -> CompileResult<'s> {
 		if self.name_info(name, None).is_some() {
 			return Err(CompileError::Reassignment(name))
 		}
@@ -136,7 +134,7 @@ impl <'s, 'w, W: Write> Compiler<'s, 'w, W> {
 		Ok(())
 	}
 
-	fn stmt_func(&mut self, name: &'s str, args: &[&'s str], body: &Expr<'s>) -> CompileResult<'s> {
+	fn defn_func(&mut self, name: &'s str, args: &[&'s str], body: &(Vec<Stmt<'s>>, Expr<'s>)) -> CompileResult<'s> {
 		if self.name_info(name, None).is_some() {
 			return Err(CompileError::Reassignment(name))
 		}
@@ -150,7 +148,7 @@ impl <'s, 'w, W: Write> Compiler<'s, 'w, W> {
 			locals.insert(arg);
 		}
 		write!(self.buf, ")->vec2f{{return ")?;
-		self.compile_expr(&locals, body)?;
+		self.compile_expr(&locals, &body.1)?;
 		write!(self.buf, ";}}")?;
 		Ok(())
 	}
