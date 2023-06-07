@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>cxgraph</title>
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+	<div class="canvas-container">
+		<canvas id="canvas"></canvas>
+		<canvas id="grid_canvas"></canvas>
+	</div>
+
+	<div class="menu">
+		<input id="menu_checkbox" type="checkbox" checked>
+		<div class="menu-inner" id="menu_inner">
+			<div><input type="button" id="button_graph" value="Graph"></div>
+			<textarea id="source_text">f(z) = z^2 + 3i&#10;plot(z) = 5z^2 + f(1/z) - 1</textarea>
+		</div>
+	</div>
+
+	<script>
+		import('./index.js').then(m => window.module = m)
+	</script>
+</body>
+</html>

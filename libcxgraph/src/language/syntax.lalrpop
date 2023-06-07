@@ -1,0 +1,123 @@
+use crate::language::ast::*;
+use crate::language::token::*;
+
+grammar<'input>(input: &'input str);
+
+extern {
+    type Location = usize;
+    type Error = LexerError;
+
+    enum Token<'input> {
+        "(" => Token::LParen,
+        ")" => Token::RParen,
+        "{" => Token::LBrace,
+        "}" => Token::RBrace,
+        "+" => Token::Plus,
+        "-" => Token::Minus,
+        "*" => Token::Star,
+        "/" => Token::Slash,
+        "^" => Token::Caret,
+        "," => Token::Comma,
+        "->" => Token::Arrow,
+        "=" => Token::Equal,
+        ":" => Token::Colon,
+        "\n" => Token::Newline,
+        "sum" => Token::Sum,
+        "prod" => Token::Prod,
+        "iter" => Token::Iter,
+        Float => Token::Float(<f64>),
+        Int => Token::Int(<i32>),
+        Name => Token::Name(<&'input str>),
+    }
+}
+
+// Definitions
+
+pub Program: Vec<Definition<'input>> = Definitions;
+
+Definitions: Vec<Definition<'input>> = {
+    "\n"* <defs:(<Definition> "\n"+)*> <last:Definition?> => defs.into_iter().chain(last).collect(),
+}
+
+Definition: Definition<'input> = {
+    <n:Name> "(" <args:(<Name> ",")*> <last:Name?> ")" "=" <exs:Exprs> => Definition::Function {
+        name: n,
+        args: args.into_iter().chain(last).collect(),
+        value: exs,
+    },
+    <n:Name> "=" <exs:Exprs> => Definition::Constant {
+        name: n,
+        value: exs,
+    },
+}
+
+// Expressions
+
+Exprs: Vec<Expression<'input>> = {
+    <args:(<Expr> ",")*> <last:Expr?> => args.into_iter().chain(last).collect(),
+}
+
+Expr: Expression<'input> = Store;
+
+Store: Expression<'input> = {
+    <a:Store> "->" <n:Name> => Expression::new_store(a, n),
+    Sum,
+}
+
+Sum: Expression<'input> = {
+    <a:Sum> "+" <b:Product> => Expression::new_binary(BinaryOp::Add, a, b),
+    <a:Sum> "-" <b:Product> => Expression::new_binary(BinaryOp::Sub, a, b),
+    Product,
+}
+
+Product: Expression<'input> = {
+    <a:Product> "*" <b:Unary> => Expression::new_binary(BinaryOp::Mul, a, b),
+    <a:Product> "/" <b:Unary> => Expression::new_binary(BinaryOp::Div, a, b),
+    Unary,
+}
+
+Unary: Expression<'input> = {
+    "+" <a:Unary> => Expression::new_unary(UnaryOp::Pos, a),
+    "-" <a:Unary> => Expression::new_unary(UnaryOp::Neg, a),
+    "*" <a:Unary> => Expression::new_unary(UnaryOp::Conj, a),
+    <a:Juxtapose> <b:Power> => Expression::new_binary(BinaryOp::Mul, a, b),
+    Power,
+}
+
+Juxtapose: Expression<'input> = {
+    <a:Juxtapose> <b:PreJuxtapose> => Expression::new_binary(BinaryOp::Mul, a, b),
+    PreJuxtapose,
+}
+
+Power: Expression<'input> = {
+    <a:FnCall> "^" <b:Unary> => Expression::new_binary(BinaryOp::Pow, a, b),
+    FnCall,
+}
+
+FnCall: Expression<'input> = {
+    <n:Name> "(" <args:Exprs> ")"
+        => Expression::new_fncall(n, args),
+    <Item>
+}
+
+PreJuxtapose: Expression<'input> = {
+    Number,
+    "(" <Expr> ")",
+}
+
+Item: Expression<'input> = {
+    Number,
+    <n:Name> => Expression::new_name(n),
+    "(" <Expr> ")",
+    "sum" "(" <name:Name> ":" <min:Int> "," <max:Int> ")" "{" <exs:Exprs> "}"
+        => Expression::new_sum(name, min, max, exs),
+    "prod" "(" <name:Name> ":" <min:Int> "," <max:Int> ")" "{" <exs:Exprs> "}"
+        => Expression::new_prod(name, min, max, exs),
+    "iter" "(" <count:Int> "," <name:Name> ":" <init:Expr> ")" "{" <exs:Exprs> "}"
+        => Expression::new_iter(name, count, init, exs),
+}
+
+Number: Expression<'input> = {
+    <n:Float> => Expression::new_number(n),
+    <n:Int> => Expression::new_number(n as f64),
+}

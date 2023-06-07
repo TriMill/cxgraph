@@ -1,6 +1,7 @@
 use std::num::NonZeroU64;
 
 use encase::{ShaderType, ShaderSize, UniformBuffer};
+use log::warn;
 use wgpu::util::DeviceExt;
 
 type Vec2u = cgmath::Vector2<u32>;
@@ -124,23 +125,28 @@ impl WgpuState {
 
 	pub fn load_shaders(&mut self, userdefs: &str) {
 		//  Shaders  //
-		let src = include_str!("shader.wgsl");
-		let src = src.replace("//INCLUDE//\n", userdefs);
+		let vertex_src = include_str!("vertex.wgsl").to_owned();
+		let fragment_src = include_str!("fragment.wgsl").to_owned() + userdefs;
 
-		let shader = self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+		let vertex_module = self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
 			label: None,
-			source: wgpu::ShaderSource::Wgsl(src.into())
+			source: wgpu::ShaderSource::Wgsl(vertex_src.into())
+		});
+
+		let fragment_module = self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+			label: None,
+			source: wgpu::ShaderSource::Wgsl(fragment_src.into())
 		});
 
 		let vertex = wgpu::VertexState {
-			module: &shader,
-			entry_point: "vs_main",
+			module: &vertex_module,
+			entry_point: "main",
 			buffers: &[]
 		};
 
 		let fragment = wgpu::FragmentState {
-			module: &shader,
-			entry_point: "fs_main",
+			module: &fragment_module,
+			entry_point: "main",
 			targets: &[Some(wgpu::ColorTargetState {
 				format: self.config.format,
 				blend: Some(wgpu::BlendState {

@@ -1,0 +1,46 @@
+body, html {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+}
+
+.canvas-container {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+}
+
+canvas {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	width: 100vw;
+	height: 100vh;
+}
+
+#canvas {
+	z-index: 0;
+}
+
+#grid_canvas {
+	z-index: 1;
+	pointer-events: none;
+}
+
+.menu {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	margin: 10px;
+	padding: 10px;
+	background: #334;
+	color: #fff;
+	z-index: 10;
+}
+
+
+#source_text {
+	width: 300px;
+	height: 500px;
+}

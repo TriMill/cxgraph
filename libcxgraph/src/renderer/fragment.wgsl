@@ -26,6 +26,10 @@ fn remap(val: vec2f, a1: vec2f, b1: vec2f, a2: vec2f, b2: vec2f) -> vec2f {
 const TAU = 6.283185307179586;
 const E = 2.718281828459045;
 
+const C_TAU = vec2f(TAU, 0.0);
+const C_E = vec2f(E, 0.0);
+const C_I = vec2f(0.0, 1.0);
+
 /////////////////////////
 //  complex functions  //
 /////////////////////////
@@ -122,6 +126,41 @@ fn c_tanh(z: vec2f) -> vec2f {
 	return vec2(sinh(2.0*z.x), sin(2.0*z.y)) / (cosh(2.0*z.x) + cos(2.0*z.y));
 }
 
+fn c_asin(z: vec2f) -> vec2f {
+	let u = c_sqrt(vec2f(1.0, 0.0) - c_mul(z, z));
+	let v = c_log(u + vec2(-z.y, z.x));
+	return vec2(v.y, -v.x);
+}
+
+fn c_acos(z: vec2f) -> vec2f {
+	let u = c_sqrt(vec2f(1.0, 0.0) - c_mul(z, z));
+	let v = c_log(u + vec2f(-z.y, z.x));
+	return vec2f(TAU*0.25 - v.y, v.x);
+}
+
+fn c_atan(z: vec2f) -> vec2f {
+	let u = vec2f(1.0, 0.0) - vec2f(-z.y, z.x);
+	let v = vec2f(1.0, 0.0) + vec2f(-z.y, z.x);
+	let w = c_log(c_div(u, v));
+	return 0.5 * vec2f(-w.y, w.x);
+}
+
+fn c_asinh(z: vec2f) -> vec2f {
+	let u = c_sqrt(vec2f(1.0, 0.0) + c_mul(z, z));
+	return c_log(u + z);
+}
+
+fn c_acosh(z: vec2f) -> vec2f {
+	let u = c_sqrt(vec2f(-1.0, 0.0) + c_mul(z, z));
+	return c_log(u + z);
+}
+
+fn c_atanh(z: vec2f) -> vec2f {
+	let u = vec2f(1.0, 0.0) + z;
+	let v = vec2f(1.0, 0.0) - z;
+	return 0.5 * c_log(c_div(u, v));
+}
+
 fn c_gamma(z: vec2f) -> vec2f {
 	let reflect = z.x < 0.5;
 	var zp = z;
@@ -153,33 +192,9 @@ fn c_gamma_inner2(z: vec2f) -> vec2f {
 	return c_div(w, c_mul(c_mul(z, z + vec2(1.0, 0.0)), c_mul(z + vec2(2.0, 0.0), z + vec2(3.0, 0.0))));
 }
 
-const D_EPS = 0.01;
-
 /////////////////
-//  user code  //
+//  rendering  //
 /////////////////
-
-//INCLUDE//
-
-//////////////
-//  vertex  //
-//////////////
-
-@vertex
-fn vs_main(@builtin(vertex_index) in_vertex_index: u32) -> @builtin(position) vec4f {
-    var pos = array<vec2f, 4>(
-        vec2(-1.0,-1.0),
-        vec2( 1.0,-1.0),
-        vec2(-1.0, 1.0),
-        vec2( 1.0, 1.0),
-    );
-
-    return vec4f(pos[in_vertex_index], 0.0, 1.0);
-}
-
-////////////////
-//  fragment  //
-////////////////
 
 fn hsv2rgb(c: vec3f) -> vec3f {
     let p = abs(fract(c.xxx + vec3f(1.0, 2.0/3.0, 1.0/3.0)) * 6.0 - vec3f(3.0));
@@ -187,11 +202,15 @@ fn hsv2rgb(c: vec3f) -> vec3f {
 }
 
 fn shademap(r: f32) -> f32 {
-    return r*inverseSqrt(r * r + 0.0625 * uniforms.shading_intensity)*0.9875 + 0.0125;
+    return r*inverseSqrt(r * r + 0.0625 * uniforms.shading_intensity);
 }
 
 fn colorfor(w: vec2f) -> vec3f {
 	let z = func_plot(w);
+
+	if z.x != z.x || z.y != z.y {
+		return vec3f(0.5, 0.5, 0.5);
+	}
 
 	let r = sqrt(z.x*z.x + z.y*z.y);
 	let arg = atan2(z.y, z.x);
@@ -200,10 +219,9 @@ fn colorfor(w: vec2f) -> vec3f {
 }
 
 @fragment
-fn fs_main(@builtin(position) in: vec4f) -> @location(0) vec4f {
+fn main(@builtin(position) in: vec4f) -> @location(0) vec4f {
 	let pos = vec2(in.x, f32(uniforms.resolution.y) - in.y);
 	let z = remap(pos, vec2(0.0), vec2f(uniforms.resolution), uniforms.bounds_min, uniforms.bounds_max);
-	//let dz = z - remap(pos + vec2f(1.0), vec2(0.0), vec2f(uniforms.resolution), uniforms.bounds_min, uniforms.bounds_max);
 
 	let col = colorfor(z);
 

@@ -1,8 +1,7 @@
-#![cfg(target_arch="wasm32")]
-
-use crate::{renderer::WgpuState, language::compile};
-use winit::{event_loop::EventLoop, window::Window};
-use wasm_bindgen::prelude::*;
+use libcxgraph::{renderer::WgpuState, language::compile};
+use winit::{window::WindowBuilder, event_loop::EventLoop, platform::web::WindowBuilderExtWebSys};
+use wasm_bindgen::{prelude::*, JsValue};
+use web_sys::HtmlCanvasElement;
 
 // wasm is single-threaded so there's no possibility of Bad happening
 // due to mutable global state. this will be Some(..) once start runs
@@ -23,20 +22,22 @@ pub async fn start() {
 	std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 	console_log::init_with_level(log::Level::Info).expect("Couldn't initialize logger");
 
-	let event_loop = EventLoop::new();
-	let window = Window::new(&event_loop).unwrap();
-
-	window.set_inner_size(PhysicalSize::new(100, 100));
-	web_sys::window()
+	let canvas_elem = web_sys::window()
 		.and_then(|win| win.document())
-		.and_then(|doc| {
-			let dst = doc.get_element_by_id("canvas_container")?;
-			let canvas = web_sys::Element::from(window.canvas());
-			dst.append_child(&canvas).ok()?;
-			Some(())
-		}).expect("Couldn't append canvas to document body.");
+		.and_then(|doc| Some(doc.get_element_by_id("canvas")?))
+		.expect("Could not find canvas element");
 
-	window.set_title("window");
+	let canvas: HtmlCanvasElement = canvas_elem
+		.dyn_into()
+		.expect("Canvas was not a canvas");
+
+	let event_loop = EventLoop::new();
+	let window = WindowBuilder::new()
+		.with_canvas(Some(canvas))
+		.with_inner_size(PhysicalSize::new(100, 100))
+		.with_title("window")
+		.build(&event_loop)
+		.expect("Failed to build window");
 
     let size = window.inner_size();
 	let mut state = WgpuState::new(&window, size.into()).await;
@@ -46,19 +47,15 @@ pub async fn start() {
 }
 
 #[wasm_bindgen]
-pub fn load_shader(src: &str) {
-	let wgsl = compile(src).unwrap();
-	with_state(|state| {
-		state.load_shaders(&wgsl);
-		state.redraw();
-	});
+pub fn load_shader(src: &str) -> Result<(), JsValue> {
+	let wgsl = compile(src).map_err(|e| e.to_string())?;
+	with_state(|state| state.load_shaders(&wgsl));
+	Ok(())
 }
 
 #[wasm_bindgen]
 pub fn redraw() {
-	with_state(|state| {
-		state.redraw();
-	});
+	with_state(|state| state.redraw());
 }
 
 #[wasm_bindgen]

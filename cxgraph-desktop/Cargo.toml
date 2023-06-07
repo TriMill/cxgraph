@@ -1,0 +1,11 @@
+[package]
+name = "cxgraph-desktop"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libcxgraph = { path = "../libcxgraph" }
+log = "0.4"
+env_logger = "0.10"
+winit = "0.28"
+pollster = "0.3"

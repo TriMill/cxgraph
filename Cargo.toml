@@ -1,30 +1,8 @@
-[package]
-name = "cxgraph"
-version = "0.1.0"
-edition = "2021"
+[workspace]
 
-[lib]
-crate-type = ["cdylib", "rlib"]
+members = [
+    "libcxgraph",
+    "cxgraph-desktop",
+    "cxgraph-web",
+]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-cfg-if = "1"
-wgpu = "0.16"
-cgmath = "0.18"
-encase = { version = "0.6", features = ["cgmath"] }
-raw-window-handle = "0.5"
-winit = "0.28"
-log = "0.4"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-pollster = "0.3"
-env_logger = "0.10"
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-console_error_panic_hook = "0.1"
-console_log = "1.0"
-wgpu = { version = "0.16", features = ["webgl"]}
-wasm-bindgen = "0.2"
-wasm-bindgen-futures = "0.4"
-web-sys = { version = "0.3", features = ["Document", "Window", "Element"]}
