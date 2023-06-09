@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use libcxgraph::{renderer::WgpuState, language::compile};
 use winit::{window::WindowBuilder, event_loop::EventLoop, platform::web::WindowBuilderExtWebSys};
 use wasm_bindgen::{prelude::*, JsValue};
@@ -41,14 +43,16 @@ pub async fn start() {
 
     let size = window.inner_size();
 	let mut state = WgpuState::new(&window, size.into()).await;
-	state.set_bounds((-5.0, -5.0), (5.0, 5.0));
-	state.set_shading_intensity(0.01);
+	state.uniforms.bounds_min = (-5.0, -5.0).into();
+	state.uniforms.bounds_max = ( 5.0,  5.0).into();
+	state.uniforms.shading_intensity = 0.3;
+	state.uniforms.contour_intensity = 0.0;
 	unsafe { WGPU_STATE = Some(state) };
 }
 
 #[wasm_bindgen]
 pub fn load_shader(src: &str) -> Result<(), JsValue> {
-	let wgsl = compile(src).map_err(|e| e.to_string())?;
+	let wgsl = compile(src, &HashMap::new()).map_err(|e| e.to_string())?;
 	with_state(|state| state.load_shaders(&wgsl));
 	Ok(())
 }
@@ -65,10 +69,29 @@ pub fn resize(width: u32, height: u32) {
 
 #[wasm_bindgen]
 pub fn set_bounds(min_x: f32, min_y: f32, max_x: f32, max_y: f32) {
-	with_state(|state| state.set_bounds((min_x, min_y), (max_x, max_y)));
+	with_state(|state| {
+		state.uniforms.bounds_min = (min_x, min_y).into();
+		state.uniforms.bounds_max = (max_x, max_y).into();
+	});
 }
 
 #[wasm_bindgen]
 pub fn set_shading_intensity(value: f32) {
-	with_state(|state| state.set_shading_intensity(value));
+	with_state(|state| state.uniforms.shading_intensity = value);
+}
+
+#[wasm_bindgen]
+pub fn set_contour_intensity(value: f32) {
+	with_state(|state| state.uniforms.contour_intensity = value);
+}
+
+
+#[wasm_bindgen]
+pub fn set_coloring(value: u32) {
+	with_state(|state| state.uniforms.coloring = value);
+}
+
+#[wasm_bindgen]
+pub fn set_decorations(value: u32) {
+	with_state(|state| state.uniforms.decorations = value);
 }

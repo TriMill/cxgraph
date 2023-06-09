@@ -1,3 +1,7 @@
+* {
+	font-family: monospace;
+}
+
 body, html {
 	height: 100%;
 	margin: 0;
@@ -39,8 +43,23 @@ canvas {
 	z-index: 10;
 }
 
-
 #source_text {
+	min-width: max-content;
 	width: 300px;
 	height: 500px;
+}
+
+#div_error_msg {
+	color: #f9a;
+}
+
+div.menu > details {
+	max-width: min-content;
+}
+
+details > *:not(summary) {
+	padding-top: 2px;
+	padding-bottom: 2px;
+	padding-left: 8px;
+	border-left: 1px solid #fff;
 }

@@ -54,7 +54,7 @@ Definition: Definition<'input> = {
 // Expressions
 
 Exprs: Vec<Expression<'input>> = {
-    <args:(<Expr> ",")*> <last:Expr?> => args.into_iter().chain(last).collect(),
+    <args:(<Expr> ",")*> <last:Expr> ","? => args.into_iter().chain(std::iter::once(last)).collect(),
 }
 
 Expr: Expression<'input> = Store;

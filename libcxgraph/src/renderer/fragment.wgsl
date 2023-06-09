@@ -3,10 +3,14 @@
 ////////////////
 
 struct Uniforms {
+	variables: array<vec4f, 4>,
 	resolution: vec2u,
 	bounds_min: vec2f,
 	bounds_max: vec2f,
 	shading_intensity: f32,
+	contour_intensity: f32,
+	decoration: u32,
+	coloring: u32,
 }
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
@@ -19,12 +23,21 @@ fn remap(val: vec2f, a1: vec2f, b1: vec2f, a2: vec2f, b2: vec2f) -> vec2f {
 	return a2 + (b2 - a2) * ((val - a1) / (b1 - a1));
 }
 
+fn correct_mod(x: f32, y: f32) -> f32 {
+	return ((x % y) + y) % y;
+}
+
+fn correct_mod2(x: vec2f, y: vec2f) -> vec2f {
+	return ((x % y) + y) % y;
+}
+
 /////////////////
 //  constants  //
 /////////////////
 
 const TAU = 6.283185307179586;
 const E = 2.718281828459045;
+const RECIP_SQRT2 = 0.7071067811865475;
 
 const C_TAU = vec2f(TAU, 0.0);
 const C_E = vec2f(E, 0.0);
@@ -51,7 +64,7 @@ fn c_abs_sq(z: vec2f) -> vec2f {
 }
 
 fn c_abs(z: vec2f) -> vec2f {
-	return vec2(sqrt(dot(z, z)), 0.0);
+	return vec2(length(z), 0.0);
 }
 
 fn c_arg(z: vec2f) -> vec2f {
@@ -202,28 +215,99 @@ fn hsv2rgb(c: vec3f) -> vec3f {
 }
 
 fn shademap(r: f32) -> f32 {
-    return r*inverseSqrt(r * r + 0.0625 * uniforms.shading_intensity);
+	let i = uniforms.shading_intensity * uniforms.shading_intensity * uniforms.shading_intensity;
+    return r*inverseSqrt(r * r + 0.0625 * i);
 }
 
-fn colorfor(w: vec2f) -> vec3f {
-	let z = func_plot(w);
-
+fn coloring_standard(z: vec2f) -> vec3f {
 	if z.x != z.x || z.y != z.y {
 		return vec3f(0.5, 0.5, 0.5);
 	}
 
-	let r = sqrt(z.x*z.x + z.y*z.y);
+	let r = length(z);
 	let arg = atan2(z.y, z.x);
 	let hsv = vec3f(arg / TAU + 1.0, shademap(1.0/r), shademap(r));
-	return pow(hsv2rgb(hsv), vec3(2.0));
+	return hsv2rgb(hsv);
+}
+
+fn coloring_uniform(z: vec2f) -> vec3f {
+	if z.x != z.x || z.y != z.y {
+		return vec3f(0.5, 0.5, 0.5);
+	}
+
+	let arg = atan2(z.y, z.x);
+	let mag = length(z);
+
+	let r = cos(arg - 0.0*TAU/3.0)*0.5 + 0.5;
+	let g = cos(arg - 1.0*TAU/3.0)*0.5 + 0.5;
+	let b = cos(arg - 2.0*TAU/3.0)*0.5 + 0.5;
+	let hue = vec3(r, g, b);
+	let s = 1.0 - shademap(1.0/mag);
+	let v = 1.0 - shademap(mag);
+	return hue * (1.0 - s - v) + s;
+}
+
+fn coloring_none(z: vec2f) -> vec3f {
+	return vec3f(0.5, 0.5, 0.5);
+}
+
+fn decoration_contour_re(z: vec2f) -> f32 {
+	return correct_mod(floor(z.x), 2.0) * 2.0 - 1.0;
+}
+
+fn decoration_contour_im(z: vec2f) -> f32 {
+	return correct_mod(floor(z.y), 2.0) * 2.0 - 1.0;
+}
+
+fn decoration_contour_arg(z: vec2f) -> f32 {
+	let arg = atan2(z.y, z.x);
+	return round(correct_mod(arg + TAU, TAU/8.0) * 8.0/TAU) * 2.0 - 1.0;
+}
+
+fn decoration_contour_mag(z: vec2f) -> f32 {
+	let logmag = 0.5 * log2(z.x*z.x + z.y*z.y);
+	return round(correct_mod(0.5 * logmag, 1.0)) * 2.0 - 1.0;
 }
 
 @fragment
 fn main(@builtin(position) in: vec4f) -> @location(0) vec4f {
 	let pos = vec2(in.x, f32(uniforms.resolution.y) - in.y);
-	let z = remap(pos, vec2(0.0), vec2f(uniforms.resolution), uniforms.bounds_min, uniforms.bounds_max);
+	let w = remap(pos, vec2(0.0), vec2f(uniforms.resolution), uniforms.bounds_min, uniforms.bounds_max);
 
-	let col = colorfor(z);
+	let z = func_plot(w);
 
-	return vec4f(col, 1.0);
+	var col = vec3f();
+	switch uniforms.coloring {
+		case 0u, default: {
+			col = coloring_standard(z);
+		}
+		case 1u: {
+			col = coloring_uniform(z);
+		}
+		case 2u: {
+			col = coloring_none(z);
+		}
+	}
+
+	var contours = 1.0;
+
+	if (uniforms.decoration & 0x01u) != 0u {
+		contours *= decoration_contour_re(z);
+	}
+
+	if (uniforms.decoration & 0x02u) != 0u {
+		contours *= decoration_contour_im(z);
+	}
+
+	if (uniforms.decoration & 0x04u) != 0u {
+		contours *= decoration_contour_arg(z);
+	}
+
+	if (uniforms.decoration & 0x08u) != 0u {
+		contours *= decoration_contour_mag(z);
+	}
+
+	let final_col = mix(col, vec3f(contours * 0.5 + 0.5), uniforms.contour_intensity);
+
+	return vec4f(pow(final_col, vec3(1.68)), 1.0);
 }

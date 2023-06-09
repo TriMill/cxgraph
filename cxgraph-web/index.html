@@ -10,13 +10,64 @@
 		<canvas id="grid_canvas"></canvas>
 	</div>
 
-	<div class="menu">
-		<input id="menu_checkbox" type="checkbox" checked>
-		<div class="menu-inner" id="menu_inner">
-			<div><input type="button" id="button_graph" value="Graph"></div>
-			<textarea id="source_text">f(z) = z^2 + 3i&#10;plot(z) = 5z^2 + f(1/z) - 1</textarea>
-		</div>
-	</div>
+	<div class="menu"><details open>
+		<summary>Menu</summary>
+		<div><input type="button" id="button_graph" value="Graph"></div>
+
+		<details>
+			<summary>Options</summary>
+
+			<div>
+				<div><label for="range_resolution">Resolution</label></div>
+				<input type="range" id="range_resolution" name="resolution" min="-2" max="2" step="1" value="0">
+			</div>
+
+			<div>
+				<div><label for="range_shading">Shading intensity</label></div>
+				<input type="range" id="range_shading" min="0" max="1" step="0.01" value="0.3">
+			</div>
+
+			<div>
+				<div><label for="range_contour">Contour intensity</label></div>
+				<input type="range" id="range_contour" min="0" max="1" step="0.01" value="0.0">
+			</div>
+
+			<div>
+				<div>
+					<input type="checkbox" class="decor" id="checkbox_decor_1" data-value="1">
+					<label for="checkbox_decor_1">Real contours</label>
+				</div>
+
+				<div>
+					<input type="checkbox" class="decor" id="checkbox_decor_2" data-value="2">
+					<label for="checkbox_decor_2">Imaginary contours</label>
+				</div>
+
+				<div>
+					<input type="checkbox" class="decor" id="checkbox_decor_4" data-value="4">
+					<label for="checkbox_decor_4">Argument contours</label>
+				</div>
+
+				<div>
+					<input type="checkbox" class="decor" id="checkbox_decor_8" data-value="8">
+					<label for="checkbox_decor_8">Magnitude contours</label>
+				</div>
+			</div>
+
+			<div>
+				<div>Coloring</div>
+				<input type="radio" name="color_mode" id="radio_color_0" data-value="0" checked>
+				<label for="radio_color_0">Standard</label><br>
+				<input type="radio" name="color_mode" id="radio_color_1" data-value="1">
+				<label for="radio_color_1">Uniform</label><br>
+				<input type="radio" name="color_mode" id="radio_color_2" data-value="2">
+				<label for="radio_color_2">None</label>
+			</div>
+		</details>
+
+		<div id="div_error_msg" hidden></div>
+		<div><textarea id="source_text">f(z) = z^2 + 3i&#10;plot(z) = 5z^2 + f(1/z) - 1</textarea></div>
+	</div></div>
 
 	<script>
 		import('./index.js').then(m => window.module = m)

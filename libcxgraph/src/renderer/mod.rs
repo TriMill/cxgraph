@@ -1,22 +1,45 @@
-use std::num::NonZeroU64;
+use std::{num::NonZeroU64, io::Cursor};
 
-use encase::{ShaderType, ShaderSize, UniformBuffer};
-use log::warn;
+use log::info;
 use wgpu::util::DeviceExt;
 
-type Vec2u = cgmath::Vector2<u32>;
-type Vec2f = cgmath::Vector2<f32>;
-
-#[derive(ShaderType)]
-struct Uniforms {
-	pub resolution: Vec2u,
-	pub bounds_min: Vec2f,
-	pub bounds_max: Vec2f,
+#[derive(Debug)]
+#[repr(C)]
+pub struct Uniforms {
+	pub variables: [f32; 16],
+	pub resolution: (u32, u32),
+	pub bounds_min: (f32, f32),
+	pub bounds_max: (f32, f32),
 	pub shading_intensity: f32,
+	pub contour_intensity: f32,
+	pub decorations: u32,
+	pub coloring: u32,
+	_padding: [u8; 8],
+}
+
+const UNIFORM_SIZE: usize = std::mem::size_of::<Uniforms>();
+
+impl Uniforms {
+	pub fn encode(&self, buf: &mut impl std::io::Write) -> Result<(), std::io::Error> {
+		for var in self.variables {
+			buf.write_all(&var.to_le_bytes())?;
+		}
+		buf.write_all(&self.resolution.0.to_le_bytes())?;
+		buf.write_all(&self.resolution.1.to_le_bytes())?;
+		buf.write_all(&self.bounds_min.0.to_le_bytes())?;
+		buf.write_all(&self.bounds_min.1.to_le_bytes())?;
+		buf.write_all(&self.bounds_max.0.to_le_bytes())?;
+		buf.write_all(&self.bounds_max.1.to_le_bytes())?;
+		buf.write_all(&self.shading_intensity.to_le_bytes())?;
+		buf.write_all(&self.contour_intensity.to_le_bytes())?;
+		buf.write_all(&self.decorations.to_le_bytes())?;
+		buf.write_all(&self.coloring.to_le_bytes())?;
+		Ok(())
+	}
 }
 
 pub struct WgpuState {
-	uniforms: Uniforms,
+	pub uniforms: Uniforms,
 	surface: wgpu::Surface,
 	device: wgpu::Device,
 	config: wgpu::SurfaceConfiguration,
@@ -67,21 +90,21 @@ impl WgpuState {
 		let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 			label: None,
 			usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-			contents: &[0; Uniforms::SHADER_SIZE.get() as usize],
+			contents: &[0; UNIFORM_SIZE],
 		});
 
 		let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 			label: None,
 			entries: &[
 				wgpu::BindGroupLayoutEntry {
-					visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+					binding: 1,
+					visibility: wgpu::ShaderStages::FRAGMENT,
 					ty: wgpu::BindingType::Buffer {
 						ty: wgpu::BufferBindingType::Uniform,
 						has_dynamic_offset: false,
 						min_binding_size: None,
 					},
 					count: None,
-					binding: 1,
 				},
 			]
 		});
@@ -95,7 +118,7 @@ impl WgpuState {
 					resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
 						buffer: &uniform_buffer,
 						offset: 0,
-						size: Some(NonZeroU64::new(Uniforms::SHADER_SIZE.get()).unwrap()),
+						size: Some(NonZeroU64::new(UNIFORM_SIZE as u64).unwrap()),
 					}),
 				},
 			],
@@ -104,10 +127,15 @@ impl WgpuState {
 		//  Done  //
 
         let uniforms = Uniforms {
+			variables: [0.0; 16],
             resolution: size.into(),
-            bounds_min: [-0.0, -0.0].into(),
-            bounds_max: [ 0.0,  0.0].into(),
+            bounds_min: (-0.0, -0.0),
+            bounds_max: ( 0.0,  0.0),
             shading_intensity: 0.0,
+            contour_intensity: 0.0,
+			decorations: 0,
+			coloring: 0,
+			_padding: [0; 8],
         };
 
 		Self {
@@ -205,9 +233,11 @@ impl WgpuState {
                 rpass.draw(1..4, 0..1);
 			}
 		}
-		let mut uniform_buffer = UniformBuffer::new([0; Uniforms::SHADER_SIZE.get() as usize]);
-		uniform_buffer.write(&self.uniforms).unwrap();
-		self.queue.write_buffer(&self.uniform_buffer, 0, &uniform_buffer.into_inner());
+		info!("Redrawing");
+		info!("Uniforms: {:?}", self.uniforms);
+		let mut cursor = Cursor::new([0; UNIFORM_SIZE]);
+		self.uniforms.encode(&mut cursor).unwrap();
+		self.queue.write_buffer(&self.uniform_buffer, 0, &cursor.into_inner());
 		self.queue.submit(Some(encoder.finish()));
 		frame.present();
 	}
@@ -218,14 +248,5 @@ impl WgpuState {
 		self.config.height = size.1;
 		self.surface.configure(&self.device, &self.config);
 		self.uniforms.resolution = size.into();
-	}
-
-	pub fn set_bounds(&mut self, min: (f32, f32), max: (f32, f32)) {
-		self.uniforms.bounds_min = min.into();
-		self.uniforms.bounds_max = max.into();
-	}
-
-	pub fn set_shading_intensity(&mut self, value: f32) {
-		self.uniforms.shading_intensity = value;
 	}
 }

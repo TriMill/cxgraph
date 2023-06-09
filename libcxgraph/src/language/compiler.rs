@@ -1,6 +1,6 @@
 use std::{collections::{HashSet, HashMap}, fmt};
 
-use super::{ast::{Definition, Expression, ExpressionType, BinaryOp, UnaryOp}, builtins::{BUILTIN_CONSTS, BUILTIN_FUNCS}};
+use super::{ast::{Definition, Expression, ExpressionType, BinaryOp, UnaryOp}, builtins::{BUILTIN_CONSTS, BUILTIN_FUNCS}, Variable};
 
 #[derive(Clone, Debug)]
 pub struct CompileError(String);
@@ -83,6 +83,7 @@ fn format_tmp(idx: usize) -> String { format!("tmp_{}", idx) }
 
 pub struct Compiler<'w, 'i, W: fmt::Write> {
 	buf: &'w mut W,
+	vars: &'w HashMap<String, Variable>,
 	global_funcs: HashMap<&'i str, usize>,
 	global_consts: HashSet<&'i str>,
 }
@@ -109,9 +110,10 @@ impl<'i> LocalState<'i> {
 }
 
 impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
-	pub fn new(buf: &'w mut W) -> Self {
+	pub fn new(buf: &'w mut W, vars: &'w HashMap<String, Variable>) -> Self {
 		Self {
 			buf,
+			vars,
 			global_consts: HashSet::new(),
 			global_funcs: HashMap::new(),
 		}

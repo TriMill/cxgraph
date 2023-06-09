@@ -1,4 +1,6 @@
 
+use std::collections::HashMap;
+
 use libcxgraph::{renderer::WgpuState, language::compile};
 use winit::{event_loop::EventLoop, window::Window, event::{Event, WindowEvent}};
 
@@ -8,7 +10,7 @@ fn main() {
 		.init();
 
 	let src = "plot(z) = 27^z - 9^z - 3^z";
-	let wgsl = compile(src).unwrap();
+	let wgsl = compile(src, &HashMap::new()).unwrap();
 	println!("{wgsl}");
 
 	let event_loop = EventLoop::new();
@@ -24,8 +26,9 @@ async fn run(event_loop: EventLoop<()>, window: Window, code: &str) {
 
     state.load_shaders(code);
 
-	state.set_bounds((-5.0, -5.0), (5.0, 5.0));
-	state.set_shading_intensity(0.05);
+	state.uniforms.bounds_min = (-5.0, -5.0).into();
+	state.uniforms.bounds_max = ( 5.0,  5.0).into();
+	state.uniforms.shading_intensity = 0.3;
 
 	event_loop.run(move |event, _, control_flow| {
 		control_flow.set_wait();

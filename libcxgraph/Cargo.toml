@@ -12,8 +12,6 @@ log = "0.4"
 lalrpop-util = { version = "0.20.0", features = ["lexer", "unicode"] }
 num-complex = "0.4"
 wgpu = "0.16"
-cgmath = "0.18"
-encase = { version = "0.6", features = ["cgmath"] }
 raw-window-handle = "0.5"
 
 [build-dependencies]
