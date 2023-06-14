@@ -1,6 +1,5 @@
 use std::{num::NonZeroU64, io::Cursor};
 
-use log::info;
 use wgpu::util::DeviceExt;
 
 #[derive(Debug)]
@@ -233,8 +232,6 @@ impl WgpuState {
                 rpass.draw(1..4, 0..1);
 			}
 		}
-		info!("Redrawing");
-		info!("Uniforms: {:?}", self.uniforms);
 		let mut cursor = Cursor::new([0; UNIFORM_SIZE]);
 		self.uniforms.encode(&mut cursor).unwrap();
 		self.queue.write_buffer(&self.uniform_buffer, 0, &cursor.into_inner());

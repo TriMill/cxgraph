@@ -1,6 +1,6 @@
 use std::{collections::{HashSet, HashMap}, fmt};
 
-use super::{ast::{Definition, Expression, ExpressionType, BinaryOp, UnaryOp}, builtins::{BUILTIN_CONSTS, BUILTIN_FUNCS}, Variable};
+use super::{ast::{Definition, Expression, ExpressionType, BinaryOp, UnaryOp}, builtins::{BUILTIN_CONSTS, BUILTIN_FUNCS}};
 
 #[derive(Clone, Debug)]
 pub struct CompileError(String);
@@ -25,44 +25,11 @@ impl From<fmt::Error> for CompileError {
     }
 }
 
-const GREEK_LOWER: [&str; 25] = [
-	"Al", "Be", "Ga", "De", "Ep",
-	"Ze", "Et", "Th", "Io", "Ka",
-	"La", "Mu", "Nu", "Xi", "Om",
-	"Pi", "Rh", "Sj", "Si", "Ta",
-	"Yp", "Ph", "Ch", "Ps", "Oa",
-];
-
-const GREEK_UPPER: [&str; 25] = [
-	"AL", "BE", "GA", "DE", "EP",
-	"ZE", "ET", "TH", "IO", "KA",
-	"LA", "MU", "NU", "XI", "OM",
-	"PI", "RH", "SJ", "SI", "TA",
-	"YP", "PH", "CH", "PS", "OA",
-];
-
 fn format_char(buf: &mut String, c: char) {
 	match c {
-		'a'..='z' | 'A'..='Z' | '0'..='9' => buf.push(c),
-		'_' => buf.push_str("__"),
-		'\'' => buf.push_str("_p"),
-		'\u{0391}'..='\u{03A9}' => {
-			buf.push('_');
-			buf.push_str(GREEK_UPPER[c as usize - 0x0391])
-		},
-		'\u{03B1}'..='\u{03C9}' => {
-			buf.push('_');
-			buf.push_str(GREEK_LOWER[c as usize - 0x03B1])
-		},
-		c => {
-			buf.push('_');
-			let mut b = [0u8; 8];
-			let s = c.encode_utf8(&mut b);
-			for b in s.bytes() {
-				buf.push(char::from_digit(b as u32 >> 4, 16).unwrap());
-				buf.push(char::from_digit(b as u32 & 0x0f, 16).unwrap());
-			}
-		}
+		'_' => buf.push_str("u_"),
+		'\'' => buf.push_str("p_"),
+		c => buf.push(c),
 	}
 }
 
@@ -83,7 +50,7 @@ fn format_tmp(idx: usize) -> String { format!("tmp_{}", idx) }
 
 pub struct Compiler<'w, 'i, W: fmt::Write> {
 	buf: &'w mut W,
-	vars: &'w HashMap<String, Variable>,
+	vars: &'w HashMap<String, usize>,
 	global_funcs: HashMap<&'i str, usize>,
 	global_consts: HashSet<&'i str>,
 }
@@ -110,7 +77,7 @@ impl<'i> LocalState<'i> {
 }
 
 impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
-	pub fn new(buf: &'w mut W, vars: &'w HashMap<String, Variable>) -> Self {
+	pub fn new(buf: &'w mut W, vars: &'w HashMap<String, usize>) -> Self {
 		Self {
 			buf,
 			vars,
@@ -167,8 +134,12 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 	}
 
 	pub fn ensure_plot_defined(&self) -> Result<(), CompileError> {
-		if self.global_funcs.contains_key("plot") {
-			Ok(())
+		if let Some(n) = self.global_funcs.get("plot") {
+			if *n == 1 {
+                Ok(())
+			} else {
+                Err("Plot function has wrong number of arguments".to_owned().into())
+			}
 		} else {
 			Err("No plot function defined".to_owned().into())
 		}
@@ -272,7 +243,7 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 				let v = self.compile_expr(local, init)?;
 				writeln!(self.buf, "var {itervar_fmt} = {v};")?;
 				let ivar = local.next_tmp();
-				writeln!(self.buf, "for(var {ivar}: i32 = 0; {ivar} <= {count}; {ivar}++) {{")?;
+				writeln!(self.buf, "for(var {ivar}: i32 = 0; {ivar} < {count}; {ivar}++) {{")?;
 				let mut loop_local = local.clone();
 				loop_local.local_vars.insert(itervar);
 				let mut last = String::new();
@@ -288,8 +259,8 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 	fn resolve_func(&self, name: &str) -> Result<(String, usize), CompileError> {
 		if let Some(argc) = self.global_funcs.get(name) {
 			Ok((format_func(name), *argc))
-		} else if let Some((var, f)) = BUILTIN_FUNCS.with(|c| c.get(name).copied()) {
-			Ok(((*var).to_owned(), f.argc()))
+		} else if let Some((var, argc)) = BUILTIN_FUNCS.with(|c| c.get(name).copied()) {
+			Ok(((*var).to_owned(), argc))
 		} else {
 			Err(format!("use of undeclared function {name}").into())
 		}
@@ -300,6 +271,12 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 			Ok(format_local(name))
 		} else if self.global_consts.contains(name) {
 			Ok(format_const(name) + "()")
+		} else if let Some(var) = self.vars.get(name) {
+			if var % 2 == 0 {
+				Ok(format!("uniforms.variables[{}].xy", var/2))
+			} else {
+				Ok(format!("uniforms.variables[{}].zw", var/2))
+			}
 		} else if let Some(var) = BUILTIN_CONSTS.with(|c| Some(c.get(name)?.0)) {
 			Ok(var.to_owned())
 		} else {

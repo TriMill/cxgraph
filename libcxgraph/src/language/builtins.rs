@@ -1,105 +1,69 @@
-use std::{collections::HashMap, ops, f64::consts::{TAU, E}};
+use std::collections::HashMap;
 
 use num_complex::Complex64 as Complex;
 
-#[derive(Clone, Copy)]
-pub enum Func {
-	One(fn(Complex) -> Complex),
-	Two(fn(Complex, Complex) -> Complex),
-}
-
-impl Func {
-	pub fn argc(&self) -> usize {
-		match self {
-			Func::One(_) => 1,
-			Func::Two(_) => 2,
-		}
-	}
-}
-
-fn neg(z: Complex) -> Complex { -z }
-fn re(z: Complex) -> Complex { Complex::from(z.re) }
-fn im(z: Complex) -> Complex { Complex::from(z.im) }
-fn abs_sq(z: Complex) -> Complex { Complex::from(z.norm_sqr()) }
-fn abs(z: Complex) -> Complex { Complex::from(z.norm()) }
-fn arg(z: Complex) -> Complex { Complex::from(z.arg()) }
-fn recip(z: Complex) -> Complex { Complex::new(1.0, 0.0) / z }
-fn conj(z: Complex) -> Complex { z.conj() }
-
-
-fn gamma(z: Complex) -> Complex {
-	let reflect = z.re < 0.5;
-	let zp = if reflect { 1.0 - z } else { z };
-	let mut w = gamma_inner(zp + 3.0) / (zp*(zp+1.0)*(zp+2.0)*(zp+3.0));
-	if reflect {
-		w = TAU * 0.5 / ((TAU * 0.5 * z).sin() * w);
-	}
-	return w;
-}
-
-// Yang, ZH., Tian, JF. An accurate approximation formula for gamma function. J Inequal Appl 2018, 56 (2018).
-// https://doi.org/10.1186/s13660-018-1646-6
-fn gamma_inner(z: Complex) -> Complex {
-	let z2 = z * z;
-	let z3 = z2 * z;
-
-	let a = (TAU * z).sqrt();
-	let b = (1.0 / (E * E) * z3 * (1.0/z).sinh()).powc(0.5 * z);
-	let c = ((7.0/324.0) / (z3 * (35.0 * z2 + 33.0))).exp();
-
-	return a * b * c;
-}
-
 thread_local! {
-	pub static BUILTIN_FUNCS: HashMap<&'static str, (&'static str, Func)> = {
+	pub static BUILTIN_FUNCS: HashMap<&'static str, (&'static str, usize)> = {
 		let mut m = HashMap::new();
-		m.insert("pos",    ("c_pos",    Func::One(std::convert::identity)));
-		m.insert("neg",    ("c_neg",    Func::One(neg)));
-		m.insert("recip",  ("c_recip",  Func::One(recip)));
-		m.insert("conj",   ("c_conj",   Func::One(conj)));
+		m.insert("pos",    ("c_pos",    1));
+		m.insert("neg",    ("c_neg",    1));
+		m.insert("recip",  ("c_recip",  1));
+		m.insert("conj",   ("c_conj",   1));
 
-		m.insert("re",       ("c_re",     Func::One(re)));
-		m.insert("im",       ("c_im",     Func::One(im)));
-		m.insert("abs_sq",   ("c_abs_sq", Func::One(abs_sq)));
-		m.insert("abs",      ("c_abs",    Func::One(abs)));
-		m.insert("arg",      ("c_arg",    Func::One(arg)));
+		m.insert("re",       ("c_re",     1));
+		m.insert("im",       ("c_im",     1));
+		m.insert("signre",   ("c_signre", 1));
+		m.insert("signim",   ("c_signim", 1));
+		m.insert("abs_sq",   ("c_abs_sq", 1));
+		m.insert("abs",      ("c_abs",    1));
+		m.insert("arg",      ("c_arg",    1));
+		m.insert("argbr",    ("c_argbr",  2));
 
-		m.insert("add",      ("c_add",    Func::Two(<Complex as ops::Add>::add)));
-		m.insert("sub",      ("c_sub",    Func::Two(<Complex as ops::Sub>::sub)));
-		m.insert("mul",      ("c_mul",    Func::Two(<Complex as ops::Mul>::mul)));
-		m.insert("div",      ("c_div",    Func::Two(<Complex as ops::Div>::div)));
-		m.insert("pow",      ("c_pow",    Func::Two(Complex::powc)));
+		m.insert("add",      ("c_add",    2));
+		m.insert("sub",      ("c_sub",    2));
+		m.insert("mul",      ("c_mul",    2));
+		m.insert("div",      ("c_div",    2));
+		m.insert("pow",      ("c_pow",    2));
 
-		m.insert("exp",      ("c_exp",    Func::One(Complex::exp)));
-		m.insert("log",      ("c_log",    Func::One(Complex::ln)));
-		m.insert("sqrt",     ("c_sqrt",   Func::One(Complex::sqrt)));
+		m.insert("exp",      ("c_exp",    1));
+		m.insert("log",      ("c_log",    1));
+		m.insert("logbr",    ("c_logbr",  2));
+		m.insert("sqrt",     ("c_sqrt",   1));
 
-		m.insert("sin",      ("c_sin",    Func::One(Complex::sin)));
-		m.insert("cos",      ("c_cos",    Func::One(Complex::cos)));
-		m.insert("tan",      ("c_tan",    Func::One(Complex::tan)));
-		m.insert("sinh",     ("c_sinh",   Func::One(Complex::sinh)));
-		m.insert("cosh",     ("c_cosh",   Func::One(Complex::cosh)));
-		m.insert("tanh",     ("c_tanh",   Func::One(Complex::tanh)));
+		m.insert("sin",      ("c_sin",    1));
+		m.insert("cos",      ("c_cos",    1));
+		m.insert("tan",      ("c_tan",    1));
+		m.insert("sinh",     ("c_sinh",   1));
+		m.insert("cosh",     ("c_cosh",   1));
+		m.insert("tanh",     ("c_tanh",   1));
 
-		m.insert("asin",     ("c_asin",   Func::One(Complex::asin)));
-		m.insert("acos",     ("c_acos",   Func::One(Complex::acos)));
-		m.insert("atan",     ("c_atan",   Func::One(Complex::atan)));
-		m.insert("asinh",    ("c_asinh",  Func::One(Complex::asinh)));
-		m.insert("acosh",    ("c_acosh",  Func::One(Complex::acosh)));
-		m.insert("atanh",    ("c_atanh",  Func::One(Complex::atanh)));
+		m.insert("asin",     ("c_asin",   1));
+		m.insert("acos",     ("c_acos",   1));
+		m.insert("atan",     ("c_atan",   1));
+		m.insert("asinh",    ("c_asinh",  1));
+		m.insert("acosh",    ("c_acosh",  1));
+		m.insert("atanh",    ("c_atanh",  1));
 
-		m.insert("gamma",    ("c_gamma",  Func::One(gamma)));
-		m.insert("\u{0393}", ("c_gamma",  Func::One(gamma)));
+		m.insert("gamma",       ("c_gamma",    1));
+		m.insert("\u{0393}",    ("c_gamma",    1));
+		m.insert("loggamma",    ("c_loggamma", 1));
+		m.insert("log\u{0393}", ("c_loggamma", 1));
+		m.insert("digamma",     ("c_digamma",  1));
+		m.insert("\u{03C8}",    ("c_digamma",  1));
 
 		m
 	};
 
 	pub static BUILTIN_CONSTS: HashMap<&'static str, (&'static str, Complex)> = {
 		let mut m = HashMap::new();
-		m.insert("tau",      ("C_TAU", Complex::new(std::f64::consts::TAU, 0.0)));
-		m.insert("\u{03C4}", ("C_TAU", Complex::new(std::f64::consts::TAU, 0.0)));
-		m.insert("e",        ("C_E",   Complex::new(std::f64::consts::E, 0.0)));
-		m.insert("i",        ("C_I",   Complex::new(0.0, 1.0)));
+		m.insert("i",        ("C_I",       Complex::new(0.0, 1.0)));
+		m.insert("e",        ("C_E",       Complex::new(std::f64::consts::E, 0.0)));
+		m.insert("tau",      ("C_TAU",     Complex::new(std::f64::consts::TAU, 0.0)));
+		m.insert("\u{03C4}", ("C_TAU",     Complex::new(std::f64::consts::TAU, 0.0)));
+		m.insert("emgamma",  ("C_EMGAMMA", Complex::new(0.5772156649015329, 0.0)));
+		m.insert("\u{03B3}", ("C_EMGAMMA", Complex::new(0.5772156649015329, 0.0)));
+		m.insert("phi",      ("C_PHI",     Complex::new(1.618033988749895, 0.0)));
+		m.insert("\u{03C6}", ("C_PHI",     Complex::new(1.618033988749895, 0.0)));
 		m
 	}
 }

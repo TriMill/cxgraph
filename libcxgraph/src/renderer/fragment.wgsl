@@ -38,10 +38,14 @@ fn correct_mod2(x: vec2f, y: vec2f) -> vec2f {
 const TAU = 6.283185307179586;
 const E = 2.718281828459045;
 const RECIP_SQRT2 = 0.7071067811865475;
+const LOG_TAU = 1.8378770664093453;
+const LOG_2 = 0.6931471805599453;
 
 const C_TAU = vec2f(TAU, 0.0);
 const C_E = vec2f(E, 0.0);
 const C_I = vec2f(0.0, 1.0);
+const C_EMGAMMA = vec2f(0.5772156649015329, 0.0);
+const C_PHI = vec2f(1.618033988749895, 0.0);
 
 /////////////////////////
 //  complex functions  //
@@ -53,6 +57,14 @@ fn c_re(z: vec2f) -> vec2f {
 
 fn c_im(z: vec2f) -> vec2f {
 	return vec2(z.y, 0.0);
+}
+
+fn c_signre(z: vec2f) -> vec2f {
+	return vec2(sign(z.x), 0.0);
+}
+
+fn c_signim(z: vec2f) -> vec2f {
+	return vec2(sign(z.y), 0.0);
 }
 
 fn c_conj(z: vec2f) -> vec2f {
@@ -69,6 +81,12 @@ fn c_abs(z: vec2f) -> vec2f {
 
 fn c_arg(z: vec2f) -> vec2f {
 	return vec2(atan2(z.y, z.x), 0.0);
+}
+
+fn c_argbr(z: vec2f, br: vec2f) -> vec2f {
+	let r = vec2(cos(-br.x), sin(-br.x));
+	let zr = c_mul(z, r);
+	return vec2(atan2(zr.y, zr.x) + br.x, 0.0);
 }
 
 fn c_add(u: vec2f, v: vec2f) -> vec2f {
@@ -105,6 +123,10 @@ fn c_exp(z: vec2f) -> vec2f {
 
 fn c_log(z: vec2f) -> vec2f {
 	return vec2(0.5 * log(dot(z, z)), atan2(z.y, z.x));
+}
+
+fn c_logbr(z: vec2f, br: vec2f) -> vec2f {
+	return vec2(0.5 * log(dot(z, z)), c_argbr(z, br).x);
 }
 
 fn c_pow(u: vec2f, v: vec2f) -> vec2f {
@@ -174,6 +196,8 @@ fn c_atanh(z: vec2f) -> vec2f {
 	return 0.5 * c_log(c_div(u, v));
 }
 
+// gamma //
+
 fn c_gamma(z: vec2f) -> vec2f {
 	let reflect = z.x < 0.5;
 	var zp = z;
@@ -205,6 +229,62 @@ fn c_gamma_inner2(z: vec2f) -> vec2f {
 	return c_div(w, c_mul(c_mul(z, z + vec2(1.0, 0.0)), c_mul(z + vec2(2.0, 0.0), z + vec2(3.0, 0.0))));
 }
 
+// log gamma //
+
+fn c_loggamma(z: vec2f) -> vec2f {
+	let reflect = z.x < 0.5 && abs(z.y) < 10.0;
+	var zp = z;
+	if reflect {
+		zp = vec2(1.0, 0.0) - z;
+	}
+	var w = c_loggamma_inner2(zp);
+	if reflect {
+		//let offset = select(0.0, TAU / 2.0, z % 2.0 < 1.0);
+		let br = 0.5 * TAU * (0.5 - z.x) * sign(z.y);
+		w = vec2(LOG_TAU - LOG_2, 0.0) - c_logbr(c_sin(TAU/2.0 * z), vec2(br, 0.0)) - w;
+	}
+	return w;
+}
+
+fn c_loggamma_inner(z: vec2f) -> vec2f {
+	return c_mul(z - vec2(0.5, 0.0), c_log(z)) - z + vec2(0.5*LOG_TAU, 0.0) + c_recip(12.0 * z);
+}
+
+fn c_loggamma_inner2(z: vec2f) -> vec2f {
+	let w = c_loggamma_inner(z + vec2(3.0, 0.0));
+	let l = c_log(z) + c_log(z + vec2(1.0, 0.0)) + c_log(z + vec2(2.0, 0.0));
+	return w - l;
+}
+
+// digamma //
+
+fn c_digamma(z: vec2f) -> vec2f {
+	let reflect = z.x < 0.5;
+	var zp = z;
+	if reflect {
+		zp = vec2(1.0, 0.0) - z;
+	}
+	var w = c_digamma_inner2(zp);
+	if reflect {
+		w -= TAU / 2.0 * c_recip(c_tan(TAU / 2.0 * z));
+	}
+	return w;
+}
+
+fn c_digamma_inner(z: vec2f) -> vec2f {
+	let zr = c_recip(z);
+	let zr2 = c_mul(zr, zr);
+	let zr4 = c_mul(zr2, zr2);
+	let zr6 = c_mul(zr2, zr4);
+	return c_log(z) - 0.5*zr - (1.0/12.0)*zr2 + (1.0/120.0)*zr4 - (1.0/252.0)*zr6;
+}
+
+fn c_digamma_inner2(z: vec2f) -> vec2f {
+	let w = c_digamma_inner(z + vec2(3.0, 0.0));
+	let l = c_recip(z + vec2(2.0, 0.0)) + c_recip(z + vec2(1.0, 0.0)) + c_recip(z);
+	return w - l;
+}
+
 /////////////////
 //  rendering  //
 /////////////////
@@ -215,8 +295,12 @@ fn hsv2rgb(c: vec3f) -> vec3f {
 }
 
 fn shademap(r: f32) -> f32 {
-	let i = uniforms.shading_intensity * uniforms.shading_intensity * uniforms.shading_intensity;
-    return r*inverseSqrt(r * r + 0.0625 * i);
+	if uniforms.shading_intensity == 0.0 {
+		return 1.0;
+	} else {
+		let i = uniforms.shading_intensity * uniforms.shading_intensity * uniforms.shading_intensity;
+		return r*inverseSqrt(r * r + 0.0625 * i);
+	}
 }
 
 fn coloring_standard(z: vec2f) -> vec3f {
@@ -224,19 +308,33 @@ fn coloring_standard(z: vec2f) -> vec3f {
 		return vec3f(0.5, 0.5, 0.5);
 	}
 
-	let r = length(z);
+	let mag_sq = dot(z, z);
+	if mag_sq > 3.40282347E+38 {
+		return vec3f(1.0, 1.0, 1.0);
+	}
+	let mag = sqrt(mag_sq);
+
 	let arg = atan2(z.y, z.x);
-	let hsv = vec3f(arg / TAU + 1.0, shademap(1.0/r), shademap(r));
+
+	let hsv = vec3f(arg / TAU + 1.0, shademap(1.0/mag), shademap(mag));
 	return hsv2rgb(hsv);
 }
 
 fn coloring_uniform(z: vec2f) -> vec3f {
+	if z.x == 0.0 && z.y == 0.0 {
+		return vec3f(0.0, 0.0, 0.0);
+	}
 	if z.x != z.x || z.y != z.y {
 		return vec3f(0.5, 0.5, 0.5);
 	}
 
+	let mag_sq = dot(z, z);
+	if mag_sq > 3.40282347E+38 {
+		return vec3f(1.0, 1.0, 1.0);
+	}
+	let mag = sqrt(mag_sq);
+
 	let arg = atan2(z.y, z.x);
-	let mag = length(z);
 
 	let r = cos(arg - 0.0*TAU/3.0)*0.5 + 0.5;
 	let g = cos(arg - 1.0*TAU/3.0)*0.5 + 0.5;
@@ -305,6 +403,10 @@ fn main(@builtin(position) in: vec4f) -> @location(0) vec4f {
 
 	if (uniforms.decoration & 0x08u) != 0u {
 		contours *= decoration_contour_mag(z);
+	}
+
+	if(contours != contours) {
+		contours = 0.0;
 	}
 
 	let final_col = mix(col, vec3f(contours * 0.5 + 0.5), uniforms.contour_intensity);

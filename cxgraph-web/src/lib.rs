@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use libcxgraph::{renderer::WgpuState, language::compile};
+use libcxgraph::{renderer::WgpuState, language::{compile, show_ast}};
+use log::info;
 use winit::{window::WindowBuilder, event_loop::EventLoop, platform::web::WindowBuilderExtWebSys};
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::HtmlCanvasElement;
@@ -48,13 +49,24 @@ pub async fn start() {
 	state.uniforms.shading_intensity = 0.3;
 	state.uniforms.contour_intensity = 0.0;
 	unsafe { WGPU_STATE = Some(state) };
+	info!("Initialized");
 }
 
 #[wasm_bindgen]
-pub fn load_shader(src: &str) -> Result<(), JsValue> {
-	let wgsl = compile(src, &HashMap::new()).map_err(|e| e.to_string())?;
+pub fn load_shader(src: &str, var_names: Box<[JsValue]>) -> Result<(), JsValue> {
+	let names: HashMap<String, usize> = var_names.iter()
+		.enumerate()
+		.map(|(i, e)| (e.as_string().unwrap(), i))
+		.collect();
+	let wgsl = compile(src, &names).map_err(|e| e.to_string())?;
+	info!("Generated WGSL:\n{}", wgsl);
 	with_state(|state| state.load_shaders(&wgsl));
 	Ok(())
+}
+
+#[wasm_bindgen]
+pub fn show_shader_ast(src: &str) -> Result<String, JsValue> {
+	show_ast(src).map_err(|e| e.to_string().into())
 }
 
 #[wasm_bindgen]
@@ -94,4 +106,12 @@ pub fn set_coloring(value: u32) {
 #[wasm_bindgen]
 pub fn set_decorations(value: u32) {
 	with_state(|state| state.uniforms.decorations = value);
+}
+
+#[wasm_bindgen]
+pub fn set_variable(idx: usize, re: f32, im: f32) {
+	with_state(|state| {
+		state.uniforms.variables[idx*2 + 0] = re;
+		state.uniforms.variables[idx*2 + 1] = im;
+    });
 }
