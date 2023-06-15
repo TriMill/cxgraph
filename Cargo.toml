@@ -1,8 +1,8 @@
 [workspace]
 
 members = [
-    "libcxgraph",
-    "cxgraph-desktop",
-    "cxgraph-web",
+	"libcxgraph",
+	"cxgraph-desktop",
+	"cxgraph-web",
 ]
 

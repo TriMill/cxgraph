@@ -7,7 +7,7 @@ pub enum Token<'i> {
 	Int(i32),
 	Name(&'i str),
 	Sum, Prod, Iter,
-    LParen, RParen,
+	LParen, RParen,
 	LBrace, RBrace,
 	Plus, Minus, Star, Slash, Caret,
 	Comma, Arrow, Equal, Colon,
@@ -15,30 +15,30 @@ pub enum Token<'i> {
 }
 
 impl<'i> fmt::Display for Token<'i> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Token::Float(n) => write!(f, "{n}"),
-            Token::Int(n) => write!(f, "{n}"),
-            Token::Name(n) => write!(f, "{n}"),
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Token::Float(n) => write!(f, "{n}"),
+			Token::Int(n) => write!(f, "{n}"),
+			Token::Name(n) => write!(f, "{n}"),
 			Token::Sum    => f.write_str("sum"),
 			Token::Prod   => f.write_str("prod"),
 			Token::Iter   => f.write_str("iter"),
-            Token::LParen => f.write_str("("),
-            Token::RParen => f.write_str(")"),
-            Token::LBrace => f.write_str("{{"),
-            Token::RBrace => f.write_str("}}"),
-            Token::Plus   => f.write_str("+"),
-            Token::Minus  => f.write_str("-"),
-            Token::Star   => f.write_str("*"),
-            Token::Slash  => f.write_str("/"),
-            Token::Caret  => f.write_str("^"),
-            Token::Comma  => f.write_str(","),
-            Token::Arrow  => f.write_str("->"),
-            Token::Equal  => f.write_str("="),
-            Token::Colon  => f.write_str(":"),
-            Token::Newline => f.write_str("newline")
-        }
-    }
+			Token::LParen => f.write_str("("),
+			Token::RParen => f.write_str(")"),
+			Token::LBrace => f.write_str("{"),
+			Token::RBrace => f.write_str("}"),
+			Token::Plus   => f.write_str("+"),
+			Token::Minus  => f.write_str("-"),
+			Token::Star   => f.write_str("*"),
+			Token::Slash  => f.write_str("/"),
+			Token::Caret  => f.write_str("^"),
+			Token::Comma  => f.write_str(","),
+			Token::Arrow  => f.write_str("->"),
+			Token::Equal  => f.write_str("="),
+			Token::Colon  => f.write_str(":"),
+			Token::Newline => f.write_str("newline")
+		}
+	}
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -48,12 +48,12 @@ pub enum LexerError {
 }
 
 impl fmt::Display for LexerError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            LexerError::Unexpected(i, c) => write!(f, "Unexpected character {c:?} at {i}"),
-            LexerError::InvalidNumber(i, j) => write!(f, "Invalid number at {i}:{j}"),
-        }
-    }
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			LexerError::Unexpected(i, c) => write!(f, "Unexpected character {c:?} at {i}"),
+			LexerError::InvalidNumber(i, j) => write!(f, "Invalid number at {i}:{j}"),
+		}
+	}
 }
 
 pub type Spanned<T, L, E> = Result<(L, T, L), E>;
@@ -61,6 +61,7 @@ pub type Spanned<T, L, E> = Result<(L, T, L), E>;
 pub struct Lexer<'i> {
 	src: &'i str,
 	chars: Peekable<CharIndices<'i>>,
+	bracket_depth: usize,
 }
 
 fn is_ident_begin(c: char) -> bool {
@@ -73,7 +74,11 @@ fn is_ident_middle(c: char) -> bool {
 
 impl<'i> Lexer<'i> {
 	pub fn new(src: &'i str) -> Self {
-		Self { src, chars: src.char_indices().peekable() }
+		Self {
+			src,
+			chars: src.char_indices().peekable(),
+			bracket_depth: 0,
+	 }
 	}
 
 	fn next_number(&mut self, i: usize, mut has_dot: bool) -> Spanned<Token<'i>, usize, LexerError> {
@@ -117,16 +122,29 @@ impl<'i> Lexer<'i> {
 		}
 	}
 
-	fn next_token(&mut self) -> Option<Spanned<Token<'i>, usize, LexerError>> {
-		while matches!(self.chars.peek(), Some((_, ' ' | '\t' | '\r'))) {
+	fn skip_whitespace(&mut self) {
+		while matches!(self.chars.peek(), Some((_, ' ' | '\t' | '\n' | '\r'))) {
+			if self.bracket_depth == 0 && matches!(self.chars.peek(), Some((_, '\n'))) {
+				break
+			}
 			self.chars.next();
 		}
+	}
+
+	fn next_token(&mut self) -> Option<Spanned<Token<'i>, usize, LexerError>> {
+		self.skip_whitespace();
 
 		Some(match self.chars.next()? {
-			(i, '(') => Ok((i, Token::LParen, i + 1)),
-			(i, ')') => Ok((i, Token::RParen, i + 1)),
-			(i, '{') => Ok((i, Token::LBrace, i + 1)),
-			(i, '}') => Ok((i, Token::RBrace, i + 1)),
+			(_, '#') => {
+				while !matches!(self.chars.peek(), Some((_, '\n')) | None) {
+					self.chars.next();
+				}
+				self.next_token()?
+			}
+			(i, '(') => { self.bracket_depth += 1; Ok((i, Token::LParen, i + 1)) },
+			(i, ')') => { self.bracket_depth -= 1; Ok((i, Token::RParen, i + 1)) },
+			(i, '{') => { self.bracket_depth += 1; Ok((i, Token::LBrace, i + 1)) },
+			(i, '}') => { self.bracket_depth -= 1; Ok((i, Token::RBrace, i + 1)) },
 			(i, '+') => Ok((i, Token::Plus, i + 1)),
 			(i, '-') => match self.chars.peek() {
 				Some((_, '>')) => {
@@ -151,9 +169,9 @@ impl<'i> Lexer<'i> {
 }
 
 impl<'i> Iterator for Lexer<'i> {
-    type Item = Spanned<Token<'i>, usize, LexerError>;
+	type Item = Spanned<Token<'i>, usize, LexerError>;
 
-    fn next(&mut self) -> Option<Self::Item> {
+	fn next(&mut self) -> Option<Self::Item> {
 		self.next_token()
-    }
+	}
 }

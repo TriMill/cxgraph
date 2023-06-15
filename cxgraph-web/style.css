@@ -71,13 +71,14 @@ summary {
 }
 
 #source_text {
-	width: 300px;
-	height: 500px;
+	width: 400px;
+	height: 150px;
 	font-size: 15px;
 }
 
 #div_error_msg {
 	color: #f9a;
+	white-space: pre-line;
 }
 
 input {

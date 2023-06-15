@@ -19,7 +19,7 @@ let mouseY = 0.0;
 let mousePressed = false;
 
 function remap(x, lo1, hi1, lo2, hi2) {
-    return lo2 + (hi2 - lo2) * (x - lo1) / (hi1 - lo1);
+	return lo2 + (hi2 - lo2) * (x - lo1) / (hi1 - lo1);
 }
 
 function cxToScreen(cx) {
@@ -70,15 +70,25 @@ function onViewChange() {
 	let bounds = calcBounds();
 	cxgraph.set_bounds(bounds.x_min, bounds.y_min, bounds.x_max, bounds.y_max);
 	let origin = cxToScreen({ re: 0, im: 0 });
+	let one = cxToScreen({ re: 1, im: 0 });
 
-	overlay_axis_x.setAttribute("x1", 0)
-	overlay_axis_x.setAttribute("x2", dim.w);
-	overlay_axis_x.setAttribute("y1", origin.y);
-	overlay_axis_x.setAttribute("y2", origin.y);
-	overlay_axis_y.setAttribute("x1", origin.x);
-	overlay_axis_y.setAttribute("x2", origin.x);
-	overlay_axis_y.setAttribute("y1", 0);
-	overlay_axis_y.setAttribute("y2", dim.h);
+	if(svg_axis_x.visibility != "hidden") {
+		svg_axis_x.setAttribute("x1", 0)
+		svg_axis_x.setAttribute("x2", dim.w);
+		svg_axis_x.setAttribute("y1", origin.y);
+		svg_axis_x.setAttribute("y2", origin.y);
+	}
+	if(svg_axis_y.visibility != "hidden") {
+		svg_axis_y.setAttribute("x1", origin.x);
+		svg_axis_y.setAttribute("x2", origin.x);
+		svg_axis_y.setAttribute("y1", 0);
+		svg_axis_y.setAttribute("y2", dim.h);
+	}
+	if(svg_unitcircle.visibility != "hidden") {
+		svg_unitcircle.setAttribute("cx", origin.x);
+		svg_unitcircle.setAttribute("cy", origin.y);
+		svg_unitcircle.setAttribute("r", one.x - origin.x);
+	}
 
 	for(let point of graphPoints) {
 		point.onViewChange();
@@ -148,7 +158,7 @@ function onGraph() {
 		redraw();
 	} catch(e) {
 		console.log(e);
-		div_error_msg.textContent = e.toString();
+		div_error_msg.textContent = e.toString().replace("\n", "\r\n");
 		div_error_msg.hidden = false;
 	}
 }
@@ -214,10 +224,16 @@ let specialChars = new RegExp(
 console.log(specialChars);
 
 source_text.addEventListener("input", () => {
+	let e = source_text.selectionEnd;
+	let amnt = 0;
 	source_text.value = source_text.value.replace(
 		specialChars,
-		(_m, p) => charMap[p]
-	)
+		(m, p) => {
+			amnt += m.length - charMap[p].length;
+			return charMap[p];
+		}
+	);
+	source_text.selectionEnd = e - amnt;
 });
 
 //
@@ -276,8 +292,13 @@ nameColorMode[0].checked = true;
 
 overlay_axes.addEventListener("change", () => {
 	let vis = overlay_axes.checked ? "visible" : "hidden";
-	overlay_axis_x.setAttribute("visibility", vis);
-	overlay_axis_y.setAttribute("visibility", vis);
+	svg_axis_x.setAttribute("visibility", vis);
+	svg_axis_y.setAttribute("visibility", vis);
+});
+
+overlay_unitcircle.addEventListener("change", () => {
+	let vis = overlay_unitcircle.checked ? "visible" : "hidden";
+	svg_unitcircle.setAttribute("visibility", vis);
 });
 
 //

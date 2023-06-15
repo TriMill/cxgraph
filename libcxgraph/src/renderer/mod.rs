@@ -54,7 +54,7 @@ impl WgpuState {
 	where W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle {
 
 		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
-        let surface = unsafe { instance.create_surface(&window) }.unwrap();
+		let surface = unsafe { instance.create_surface(&window) }.unwrap();
 
 		let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
 			power_preference: wgpu::PowerPreference::default(),
@@ -125,17 +125,17 @@ impl WgpuState {
 
 		//  Done  //
 
-        let uniforms = Uniforms {
+		let uniforms = Uniforms {
 			variables: [0.0; 16],
-            resolution: size.into(),
-            bounds_min: (-0.0, -0.0),
-            bounds_max: ( 0.0,  0.0),
-            shading_intensity: 0.0,
-            contour_intensity: 0.0,
+			resolution: size.into(),
+			bounds_min: (-0.0, -0.0),
+			bounds_max: ( 0.0,  0.0),
+			shading_intensity: 0.0,
+			contour_intensity: 0.0,
 			decorations: 0,
 			coloring: 0,
 			_padding: [0; 8],
-        };
+		};
 
 		Self {
 			uniforms,
@@ -187,10 +187,10 @@ impl WgpuState {
 		//  Pipeline  //
 
 		let pipeline_layout = self.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[&self.uniform_layout],
-            push_constant_ranges: &[],
-        });
+			label: None,
+			bind_group_layouts: &[&self.uniform_layout],
+			push_constant_ranges: &[],
+		});
 
 		let render_pipeline = self.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 			label: None,
@@ -226,10 +226,10 @@ impl WgpuState {
 				depth_stencil_attachment: None,
 			});
 			if let Some(pipeline) = &self.render_pipeline {
-                rpass.set_pipeline(pipeline);
-                rpass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                rpass.draw(0..3, 0..1);
-                rpass.draw(1..4, 0..1);
+				rpass.set_pipeline(pipeline);
+				rpass.set_bind_group(0, &self.uniform_bind_group, &[]);
+				rpass.draw(0..3, 0..1);
+				rpass.draw(1..4, 0..1);
 			}
 		}
 		let mut cursor = Cursor::new([0; UNIFORM_SIZE]);

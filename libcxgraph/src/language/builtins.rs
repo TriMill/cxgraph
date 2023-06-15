@@ -10,6 +10,14 @@ thread_local! {
 		m.insert("recip",  ("c_recip",  1));
 		m.insert("conj",   ("c_conj",   1));
 
+		m.insert("ifgt",  ("c_ifgt",  4));
+		m.insert("iflt",  ("c_iflt",  4));
+		m.insert("ifge",  ("c_ifge",  4));
+		m.insert("ifle",  ("c_ifle",  4));
+		m.insert("ifeq",  ("c_ifeq",  4));
+		m.insert("ifne",  ("c_ifne",  4));
+		m.insert("ifnan", ("c_ifnan", 3));
+
 		m.insert("re",       ("c_re",     1));
 		m.insert("im",       ("c_im",     1));
 		m.insert("signre",   ("c_signre", 1));
@@ -24,11 +32,15 @@ thread_local! {
 		m.insert("mul",      ("c_mul",    2));
 		m.insert("div",      ("c_div",    2));
 		m.insert("pow",      ("c_pow",    2));
+		m.insert("powbr",    ("c_powbr",  3));
 
 		m.insert("exp",      ("c_exp",    1));
 		m.insert("log",      ("c_log",    1));
 		m.insert("logbr",    ("c_logbr",  2));
 		m.insert("sqrt",     ("c_sqrt",   1));
+		m.insert("sqrtbr",   ("c_sqrtbr", 2));
+		m.insert("cbrt",     ("c_cbrt",   1));
+		m.insert("cbrtbr",   ("c_cbrtbr", 2));
 
 		m.insert("sin",      ("c_sin",    1));
 		m.insert("cos",      ("c_cos",    1));
@@ -46,6 +58,8 @@ thread_local! {
 
 		m.insert("gamma",       ("c_gamma",    1));
 		m.insert("\u{0393}",    ("c_gamma",    1));
+		m.insert("invgamma",    ("c_invgamma", 1));
+		m.insert("inv\u{0393}", ("c_invgamma", 1));
 		m.insert("loggamma",    ("c_loggamma", 1));
 		m.insert("log\u{0393}", ("c_loggamma", 1));
 		m.insert("digamma",     ("c_digamma",  1));

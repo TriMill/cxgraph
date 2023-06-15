@@ -42,7 +42,7 @@ pub async fn start() {
 		.build(&event_loop)
 		.expect("Failed to build window");
 
-    let size = window.inner_size();
+	let size = window.inner_size();
 	let mut state = WgpuState::new(&window, size.into()).await;
 	state.uniforms.bounds_min = (-5.0, -5.0).into();
 	state.uniforms.bounds_max = ( 5.0,  5.0).into();
@@ -113,5 +113,5 @@ pub fn set_variable(idx: usize, re: f32, im: f32) {
 	with_state(|state| {
 		state.uniforms.variables[idx*2 + 0] = re;
 		state.uniforms.variables[idx*2 + 1] = im;
-    });
+	});
 }

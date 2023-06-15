@@ -21,10 +21,10 @@ fn main() {
 }
 
 async fn run(event_loop: EventLoop<()>, window: Window, code: &str) {
-    let size = window.inner_size();
+	let size = window.inner_size();
 	let mut state = WgpuState::new(&window, size.into()).await;
 
-    state.load_shaders(code);
+	state.load_shaders(code);
 
 	state.uniforms.bounds_min = (-5.0, -5.0).into();
 	state.uniforms.bounds_max = ( 5.0,  5.0).into();

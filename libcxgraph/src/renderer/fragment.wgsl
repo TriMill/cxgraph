@@ -31,6 +31,18 @@ fn correct_mod2(x: vec2f, y: vec2f) -> vec2f {
 	return ((x % y) + y) % y;
 }
 
+fn vlength(v: vec2f) -> f32 {
+	let l = length(v);
+	if l != l || l <= 3.4e+38 {
+		return l;
+	}
+	let a = max(abs(v.x), abs(v.y));
+	let b = RECIP_SQRT2 * abs(v.x) + RECIP_SQRT2 * abs(v.y);
+	let c = 2.0 * RECIP_SQRT29 * abs(v.x) + 5.0 * RECIP_SQRT29 * abs(v.y);
+	let d = 5.0 * RECIP_SQRT29 * abs(v.x) + 2.0 * RECIP_SQRT29 * abs(v.y);
+	return max(max(a, b), max(c, d));
+}
+
 /////////////////
 //  constants  //
 /////////////////
@@ -40,6 +52,7 @@ const E = 2.718281828459045;
 const RECIP_SQRT2 = 0.7071067811865475;
 const LOG_TAU = 1.8378770664093453;
 const LOG_2 = 0.6931471805599453;
+const RECIP_SQRT29 = 0.18569533817705186;
 
 const C_TAU = vec2f(TAU, 0.0);
 const C_E = vec2f(E, 0.0);
@@ -67,6 +80,34 @@ fn c_signim(z: vec2f) -> vec2f {
 	return vec2(sign(z.y), 0.0);
 }
 
+fn c_ifgt(p: vec2f, q: vec2f, z: vec2f, w: vec2f) -> vec2f {
+	return select(w, z, p.x > q.x);
+}
+
+fn c_iflt(p: vec2f, q: vec2f, z: vec2f, w: vec2f) -> vec2f {
+	return select(w, z, p.x < q.x);
+}
+
+fn c_ifge(p: vec2f, q: vec2f, z: vec2f, w: vec2f) -> vec2f {
+	return select(w, z, p.x >= q.x);
+}
+
+fn c_ifle(p: vec2f, q: vec2f, z: vec2f, w: vec2f) -> vec2f {
+	return select(w, z, p.x <= q.x);
+}
+
+fn c_ifeq(p: vec2f, q: vec2f, z: vec2f, w: vec2f) -> vec2f {
+	return select(w, z, p.x == q.x);
+}
+
+fn c_ifne(p: vec2f, q: vec2f, z: vec2f, w: vec2f) -> vec2f {
+	return select(w, z, p.x != q.x);
+}
+
+fn c_ifnan(p: vec2f, z: vec2f, w: vec2f) -> vec2f {
+	return select(w, z, p.x != p.x && p.y != p.y);
+}
+
 fn c_conj(z: vec2f) -> vec2f {
 	return z * vec2(1.0, -1.0);
 }
@@ -76,17 +117,20 @@ fn c_abs_sq(z: vec2f) -> vec2f {
 }
 
 fn c_abs(z: vec2f) -> vec2f {
-	return vec2(length(z), 0.0);
+	return vec2(vlength(z), 0.0);
 }
 
 fn c_arg(z: vec2f) -> vec2f {
+	if z.x < 0.0 && z.y == 0.0 {
+		return vec2(TAU/2.0, 0.0);
+	}
 	return vec2(atan2(z.y, z.x), 0.0);
 }
 
 fn c_argbr(z: vec2f, br: vec2f) -> vec2f {
 	let r = vec2(cos(-br.x), sin(-br.x));
 	let zr = c_mul(z, r);
-	return vec2(atan2(zr.y, zr.x) + br.x, 0.0);
+	return c_arg(zr) + vec2(br.x, 0.0);
 }
 
 fn c_add(u: vec2f, v: vec2f) -> vec2f {
@@ -122,7 +166,7 @@ fn c_exp(z: vec2f) -> vec2f {
 }
 
 fn c_log(z: vec2f) -> vec2f {
-	return vec2(0.5 * log(dot(z, z)), atan2(z.y, z.x));
+	return vec2(0.5 * log(dot(z, z)), c_arg(z).x);
 }
 
 fn c_logbr(z: vec2f, br: vec2f) -> vec2f {
@@ -133,8 +177,24 @@ fn c_pow(u: vec2f, v: vec2f) -> vec2f {
 	return c_exp(c_mul(c_log(u), v));
 }
 
+fn c_powbr(u: vec2f, v: vec2f, br: vec2f) -> vec2f {
+	return c_exp(c_mul(c_logbr(u, br), v));
+}
+
 fn c_sqrt(z: vec2f) -> vec2f {
 	return c_pow(z, vec2(0.5, 0.0));
+}
+
+fn c_sqrtbr(z: vec2f, br: vec2f) -> vec2f {
+	return c_powbr(z, vec2(0.5, 0.0), br);
+}
+
+fn c_cbrt(z: vec2f, br: vec2f) -> vec2f {
+	return c_pow(z, vec2(1.0/3.0, 0.0));
+}
+
+fn c_cbrtbr(z: vec2f, br: vec2f) -> vec2f {
+	return c_powbr(z, vec2(1.0/3.0, 0.0), br);
 }
 
 fn c_sin(z: vec2f) -> vec2f {
@@ -162,84 +222,50 @@ fn c_tanh(z: vec2f) -> vec2f {
 }
 
 fn c_asin(z: vec2f) -> vec2f {
-	let u = c_sqrt(vec2f(1.0, 0.0) - c_mul(z, z));
+	let u = c_sqrt(vec2(1.0, 0.0) - c_mul(z, z));
 	let v = c_log(u + vec2(-z.y, z.x));
 	return vec2(v.y, -v.x);
 }
 
 fn c_acos(z: vec2f) -> vec2f {
-	let u = c_sqrt(vec2f(1.0, 0.0) - c_mul(z, z));
-	let v = c_log(u + vec2f(-z.y, z.x));
-	return vec2f(TAU*0.25 - v.y, v.x);
+	let u = c_sqrt(vec2(1.0, 0.0) - c_mul(z, z));
+	let v = c_log(u + vec2(-z.y, z.x));
+	return vec2(TAU*0.25 - v.y, v.x);
 }
 
 fn c_atan(z: vec2f) -> vec2f {
-	let u = vec2f(1.0, 0.0) - vec2f(-z.y, z.x);
-	let v = vec2f(1.0, 0.0) + vec2f(-z.y, z.x);
+	let u = vec2(1.0, 0.0) - vec2(-z.y, z.x);
+	let v = vec2(1.0, 0.0) + vec2(-z.y, z.x);
 	let w = c_log(c_div(u, v));
-	return 0.5 * vec2f(-w.y, w.x);
+	return 0.5 * vec2(-w.y, w.x);
 }
 
 fn c_asinh(z: vec2f) -> vec2f {
-	let u = c_sqrt(vec2f(1.0, 0.0) + c_mul(z, z));
+	let u = c_sqrt(vec2(1.0, 0.0) + c_mul(z, z));
 	return c_log(u + z);
 }
 
 fn c_acosh(z: vec2f) -> vec2f {
-	let u = c_sqrt(vec2f(-1.0, 0.0) + c_mul(z, z));
+	let u = c_sqrt(vec2(-1.0, 0.0) + c_mul(z, z));
 	return c_log(u + z);
 }
 
 fn c_atanh(z: vec2f) -> vec2f {
-	let u = vec2f(1.0, 0.0) + z;
-	let v = vec2f(1.0, 0.0) - z;
+	let u = vec2(1.0, 0.0) + z;
+	let v = vec2(1.0, 0.0) - z;
 	return 0.5 * c_log(c_div(u, v));
-}
-
-// gamma //
-
-fn c_gamma(z: vec2f) -> vec2f {
-	let reflect = z.x < 0.5;
-	var zp = z;
-	if reflect {
-		zp = vec2(1.0, 0.0) - z;
-	}
-	var w = c_gamma_inner2(zp);
-	if reflect {
-		w = TAU * 0.5 * c_recip(c_mul(c_sin(TAU * 0.5 * z), w));
-	}
-	return w;
-}
-
-// Yang, ZH., Tian, JF. An accurate approximation formula for gamma function. J Inequal Appl 2018, 56 (2018).
-// https://doi.org/10.1186/s13660-018-1646-6
-fn c_gamma_inner(z: vec2f) -> vec2f {
-	let z2 = c_mul(z, z);
-	let z3 = c_mul(z2, z);
-
-	let a = c_sqrt(TAU * z);
-	let b = c_pow(1.0 / (E * E) * c_mul(z3, c_sinh(c_recip(z))), 0.5 * z);
-	let c = c_exp(7.0/324.0 * c_recip(c_mul(z3, 35.0 * z2 + 33.0)));
-
-	return c_mul(c_mul(a, b), c);
-}
-
-fn c_gamma_inner2(z: vec2f) -> vec2f {
-	let w = c_gamma_inner(z + vec2(3.0, 0.0));
-	return c_div(w, c_mul(c_mul(z, z + vec2(1.0, 0.0)), c_mul(z + vec2(2.0, 0.0), z + vec2(3.0, 0.0))));
 }
 
 // log gamma //
 
 fn c_loggamma(z: vec2f) -> vec2f {
-	let reflect = z.x < 0.5 && abs(z.y) < 10.0;
+	let reflect = z.x < 0.5 && abs(z.y) < 13.0;
 	var zp = z;
 	if reflect {
 		zp = vec2(1.0, 0.0) - z;
 	}
 	var w = c_loggamma_inner2(zp);
 	if reflect {
-		//let offset = select(0.0, TAU / 2.0, z % 2.0 < 1.0);
 		let br = 0.5 * TAU * (0.5 - z.x) * sign(z.y);
 		w = vec2(LOG_TAU - LOG_2, 0.0) - c_logbr(c_sin(TAU/2.0 * z), vec2(br, 0.0)) - w;
 	}
@@ -256,10 +282,20 @@ fn c_loggamma_inner2(z: vec2f) -> vec2f {
 	return w - l;
 }
 
+// gamma //
+
+fn c_gamma(z: vec2f) -> vec2f {
+	return c_exp(c_loggamma(z));
+}
+
+fn c_invgamma(z: vec2f) -> vec2f {
+	return c_exp(-c_loggamma(z));
+}
+
 // digamma //
 
 fn c_digamma(z: vec2f) -> vec2f {
-	let reflect = z.x < 0.5;
+	let reflect = z.x < 0.5 && abs(z.y) < 13.0;
 	var zp = z;
 	if reflect {
 		zp = vec2(1.0, 0.0) - z;
@@ -290,8 +326,8 @@ fn c_digamma_inner2(z: vec2f) -> vec2f {
 /////////////////
 
 fn hsv2rgb(c: vec3f) -> vec3f {
-    let p = abs(fract(c.xxx + vec3f(1.0, 2.0/3.0, 1.0/3.0)) * 6.0 - vec3f(3.0));
-    return c.z * mix(vec3f(1.0), clamp(p - vec3f(1.0), vec3f(0.0), vec3f(1.0)), c.y);
+	let p = abs(fract(c.xxx + vec3f(1.0, 2.0/3.0, 1.0/3.0)) * 6.0 - vec3f(3.0));
+	return c.z * mix(vec3f(1.0), clamp(p - vec3f(1.0), vec3f(0.0), vec3f(1.0)), c.y);
 }
 
 fn shademap(r: f32) -> f32 {
@@ -308,13 +344,18 @@ fn coloring_standard(z: vec2f) -> vec3f {
 		return vec3f(0.5, 0.5, 0.5);
 	}
 
-	let mag_sq = dot(z, z);
-	if mag_sq > 3.40282347E+38 {
+	let mag = vlength(z);
+	if mag > 3.40282347E+38 {
 		return vec3f(1.0, 1.0, 1.0);
 	}
-	let mag = sqrt(mag_sq);
+	if uniforms.shading_intensity > 0.0 && mag > 1.8446E+19 {
+		return vec3f(1.0, 1.0, 1.0);
+	}
+	if uniforms.shading_intensity == 0.0 && mag < 1.0E-38 {
+		return vec3f(0.0, 0.0, 0.0);
+	}
 
-	let arg = atan2(z.y, z.x);
+	let arg = c_arg(z).x;
 
 	let hsv = vec3f(arg / TAU + 1.0, shademap(1.0/mag), shademap(mag));
 	return hsv2rgb(hsv);
@@ -328,13 +369,18 @@ fn coloring_uniform(z: vec2f) -> vec3f {
 		return vec3f(0.5, 0.5, 0.5);
 	}
 
-	let mag_sq = dot(z, z);
-	if mag_sq > 3.40282347E+38 {
+	let mag = vlength(z);
+	if mag > 3.40282347E+38 {
 		return vec3f(1.0, 1.0, 1.0);
 	}
-	let mag = sqrt(mag_sq);
+	if uniforms.shading_intensity > 0.0 && mag > 1.8446E+19 {
+		return vec3f(1.0, 1.0, 1.0);
+	}
+	if uniforms.shading_intensity == 0.0 && mag < 1.0E-38 {
+		return vec3f(0.0, 0.0, 0.0);
+	}
 
-	let arg = atan2(z.y, z.x);
+	let arg = c_arg(z).x;
 
 	let r = cos(arg - 0.0*TAU/3.0)*0.5 + 0.5;
 	let g = cos(arg - 1.0*TAU/3.0)*0.5 + 0.5;
@@ -358,7 +404,7 @@ fn decoration_contour_im(z: vec2f) -> f32 {
 }
 
 fn decoration_contour_arg(z: vec2f) -> f32 {
-	let arg = atan2(z.y, z.x);
+	let arg = c_arg(z).x;
 	return round(correct_mod(arg + TAU, TAU/8.0) * 8.0/TAU) * 2.0 - 1.0;
 }
 
@@ -370,7 +416,7 @@ fn decoration_contour_mag(z: vec2f) -> f32 {
 @fragment
 fn main(@builtin(position) in: vec4f) -> @location(0) vec4f {
 	let pos = vec2(in.x, f32(uniforms.resolution.y) - in.y);
-	let w = remap(pos, vec2(0.0), vec2f(uniforms.resolution), uniforms.bounds_min, uniforms.bounds_max);
+	let w = remap(pos, vec2(0.0, 0.0), vec2f(uniforms.resolution), uniforms.bounds_min, uniforms.bounds_max);
 
 	let z = func_plot(w);
 

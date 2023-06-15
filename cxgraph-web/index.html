@@ -8,8 +8,9 @@
 	<div class="canvas-container">
 		<canvas id="canvas"></canvas>
 		<svg id="overlay">
-			<line id="overlay_axis_x" x1="0" y1="0" x2="0" y2="0" stroke="#0006" stroke-width="1.5" visibility="hidden" />
-			<line id="overlay_axis_y" x1="0" y1="0" x2="0" y2="0" stroke="#0006" stroke-width="1.5" visibility="hidden" />
+			<line id="svg_axis_x" x1="0" y1="0" x2="0" y2="0" stroke="#0006" stroke-width="1.5" visibility="hidden" />
+			<line id="svg_axis_y" x1="0" y1="0" x2="0" y2="0" stroke="#0006" stroke-width="1.5" visibility="hidden" />
+			<circle id="svg_unitcircle" cx="0" cy="0" r="0" stroke="#0006" fill="none" stroke-width="1.5" visibility="hidden" />
 			<g id="svg_point_template" visibility="hidden">
 				<circle cx="0" cy="0" r="15" stroke="none" fill="#6664" />
 				<circle cx="0" cy="0" r="5" stroke="none" fill="#6666" />
@@ -39,7 +40,7 @@
 			<summary>Options</summary>
 			<div>
 				<input type="button" id="button_reset_view" value="Reset view">
-				<input type="button" id="button_help" value="Help" onclick="window.open('docs.html')">
+				<input type="button" id="button_help" value="Help" onclick="window.open('https://g.trimill.xyz/trimill/cxgraph')">
 			</div>
 			<div>
 				<div><label for="range_resolution">Resolution</label></div>
@@ -91,8 +92,12 @@
 			<div>
 				Overlay
 				<div>
-					<input type="checkbox" id="overlay_axes" checked>
+					<input type="checkbox" id="overlay_axes">
 					<label for="overlay_axes">Draw axes</label>
+				</div>
+				<div>
+					<input type="checkbox" id="overlay_unitcircle">
+					<label for="overlay_unitcircle">Draw unit circle</label>
 				</div>
 			</div>
 		</details>

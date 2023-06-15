@@ -14,6 +14,7 @@ pub enum UnaryOp {
 
 #[derive(Clone, Copy, Debug)]
 pub enum ExpressionType<'a> {
+	Block,
 	Number(Complex),
 	Name(&'a str),
 	Binary(BinaryOp),
@@ -32,6 +33,10 @@ pub struct Expression<'a> {
 }
 
 impl<'a> Expression<'a> {
+	pub fn new_block(exs: Vec<Expression<'a>>) -> Self {
+		Self { ty: ExpressionType::Block, children: exs }
+	}
+
 	pub fn new_number(x: f64) -> Self {
 		Self { ty: ExpressionType::Number(Complex::new(x, 0.0)), children: Vec::with_capacity(0) }
 	}
@@ -87,6 +92,7 @@ pub enum Definition<'a> {
 fn display_expr(w: &mut impl fmt::Write, expr: &Expression, depth: usize) -> fmt::Result {
 	let indent = depth*2;
 	match expr.ty {
+		ExpressionType::Block => write!(w, "{:indent$}BLOCK", "", indent=indent)?,
 		ExpressionType::Number(n) => write!(w, "{:indent$}NUMBER {n:?}", "", indent=indent)?,
 		ExpressionType::Name(n) => write!(w, "{:indent$}NAME {n}", "", indent=indent)?,
 		ExpressionType::Binary(op) => write!(w, "{:indent$}OP {op:?}", "", indent=indent)?,

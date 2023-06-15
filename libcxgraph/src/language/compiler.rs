@@ -6,23 +6,23 @@ use super::{ast::{Definition, Expression, ExpressionType, BinaryOp, UnaryOp}, bu
 pub struct CompileError(String);
 
 impl fmt::Display for CompileError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.write_str(&self.0)
+	}
 }
 
 impl std::error::Error for CompileError {}
 
 impl From<String> for CompileError {
-    fn from(value: String) -> Self {
-        Self(value)
-    }
+	fn from(value: String) -> Self {
+		Self(value)
+	}
 }
 
 impl From<fmt::Error> for CompileError {
-    fn from(value: fmt::Error) -> Self {
-        Self(value.to_string())
-    }
+	fn from(value: fmt::Error) -> Self {
+		Self(value.to_string())
+	}
 }
 
 fn format_char(buf: &mut String, c: char) {
@@ -136,9 +136,9 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 	pub fn ensure_plot_defined(&self) -> Result<(), CompileError> {
 		if let Some(n) = self.global_funcs.get("plot") {
 			if *n == 1 {
-                Ok(())
+				Ok(())
 			} else {
-                Err("Plot function has wrong number of arguments".to_owned().into())
+				Err("Plot function has wrong number of arguments".to_owned().into())
 			}
 		} else {
 			Err("No plot function defined".to_owned().into())
@@ -148,6 +148,19 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 	fn compile_expr(&mut self, local: &mut LocalState<'i>, expr: &Expression<'i>)
 	-> Result<String, CompileError> {
 		match expr.ty {
+			ExpressionType::Block => {
+				let tmp = local.next_tmp();
+				writeln!(self.buf, "var {tmp}: vec2f;")?;
+				writeln!(self.buf, "{{")?;
+				let mut block_local = local.clone();
+				let mut last = String::new();
+				for child in &expr.children {
+					last = self.compile_expr(&mut block_local, child)?;
+				}
+				writeln!(self.buf, "{tmp} = {last};")?;
+				writeln!(self.buf, "}}")?;
+				Ok(tmp)
+			}
 			ExpressionType::Name(v) => self.resolve_var(local, v),
 			ExpressionType::Store(var) => {
 				let a = self.compile_expr(local, &expr.children[0])?;
