@@ -15,6 +15,26 @@ struct Uniforms {
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
 
+/////////////////
+//  constants  //
+/////////////////
+
+const TAU = 6.283185307179586;
+const E = 2.718281828459045;
+const RECIP_SQRT2 = 0.7071067811865475;
+const LOG_TAU = 1.8378770664093453;
+const LOG_2 = 0.6931471805599453;
+const RECIP_SQRT29 = 0.18569533817705186;
+
+const C_TAU = vec2f(TAU, 0.0);
+const C_E = vec2f(E, 0.0);
+const C_I = vec2f(0.0, 1.0);
+const C_EMGAMMA = vec2f(0.5772156649015329, 0.0);
+const C_PHI = vec2f(1.618033988749895, 0.0);
+const C_ZERO = vec2f(0.0, 0.0);
+const C_ONE = vec2f(1.0, 0.0);
+
+
 ///////////////
 //  utility  //
 ///////////////
@@ -43,23 +63,6 @@ fn vlength(v: vec2f) -> f32 {
 	return max(max(a, b), max(c, d));
 }
 
-/////////////////
-//  constants  //
-/////////////////
-
-const TAU = 6.283185307179586;
-const E = 2.718281828459045;
-const RECIP_SQRT2 = 0.7071067811865475;
-const LOG_TAU = 1.8378770664093453;
-const LOG_2 = 0.6931471805599453;
-const RECIP_SQRT29 = 0.18569533817705186;
-
-const C_TAU = vec2f(TAU, 0.0);
-const C_E = vec2f(E, 0.0);
-const C_I = vec2f(0.0, 1.0);
-const C_EMGAMMA = vec2f(0.5772156649015329, 0.0);
-const C_PHI = vec2f(1.618033988749895, 0.0);
-
 /////////////////////////
 //  complex functions  //
 /////////////////////////
@@ -80,32 +83,16 @@ fn c_signim(z: vec2f) -> vec2f {
 	return vec2(sign(z.y), 0.0);
 }
 
-fn c_ifgt(p: vec2f, q: vec2f, z: vec2f, w: vec2f) -> vec2f {
-	return select(w, z, p.x > q.x);
+fn c_absre(z: vec2f) -> vec2f {
+	return vec2(abs(z.x), 0.0);
 }
 
-fn c_iflt(p: vec2f, q: vec2f, z: vec2f, w: vec2f) -> vec2f {
-	return select(w, z, p.x < q.x);
+fn c_absim(z: vec2f) -> vec2f {
+	return vec2(abs(z.y), 0.0);
 }
 
-fn c_ifge(p: vec2f, q: vec2f, z: vec2f, w: vec2f) -> vec2f {
-	return select(w, z, p.x >= q.x);
-}
-
-fn c_ifle(p: vec2f, q: vec2f, z: vec2f, w: vec2f) -> vec2f {
-	return select(w, z, p.x <= q.x);
-}
-
-fn c_ifeq(p: vec2f, q: vec2f, z: vec2f, w: vec2f) -> vec2f {
-	return select(w, z, p.x == q.x);
-}
-
-fn c_ifne(p: vec2f, q: vec2f, z: vec2f, w: vec2f) -> vec2f {
-	return select(w, z, p.x != q.x);
-}
-
-fn c_ifnan(p: vec2f, z: vec2f, w: vec2f) -> vec2f {
-	return select(w, z, p.x != p.x && p.y != p.y);
+fn c_isnan(z: vec2f) -> vec2f {
+	return select(C_ZERO, C_ONE, z.x != z.x || z.y != z.y);
 }
 
 fn c_conj(z: vec2f) -> vec2f {
@@ -128,9 +115,12 @@ fn c_arg(z: vec2f) -> vec2f {
 }
 
 fn c_argbr(z: vec2f, br: vec2f) -> vec2f {
+	if z.x < 0.0 && z.y == 0.0 {
+		return vec2(TAU/2.0 + floor(br.x/TAU) * TAU, 0.0);
+	}
 	let r = vec2(cos(-br.x), sin(-br.x));
 	let zr = c_mul(z, r);
-	return c_arg(zr) + vec2(br.x, 0.0);
+	return vec2(br.x + atan2(zr.y, zr.x), 0.0);
 }
 
 fn c_add(u: vec2f, v: vec2f) -> vec2f {
@@ -222,15 +212,18 @@ fn c_tanh(z: vec2f) -> vec2f {
 }
 
 fn c_asin(z: vec2f) -> vec2f {
+	let m = select(-1.0, 1.0, z.y < 0.0 || (z.y == 0.0 && z.x > 0.0));
 	let u = c_sqrt(vec2(1.0, 0.0) - c_mul(z, z));
-	let v = c_log(u + vec2(-z.y, z.x));
-	return vec2(v.y, -v.x);
+	let v = c_log(u + m*vec2(-z.y, z.x));
+	return m*vec2(v.y, -v.x);
 }
 
+// TODO fix
 fn c_acos(z: vec2f) -> vec2f {
+	let m = select(-1.0, 1.0, z.y < 0.0 || (z.y == 0.0 && z.x > 0.0));
 	let u = c_sqrt(vec2(1.0, 0.0) - c_mul(z, z));
-	let v = c_log(u + vec2(-z.y, z.x));
-	return vec2(TAU*0.25 - v.y, v.x);
+	let v = c_log(u + m*vec2(-z.y, z.x));
+	return C_TAU/4.0 + m*vec2(-v.y, v.x);
 }
 
 fn c_atan(z: vec2f) -> vec2f {
@@ -241,19 +234,19 @@ fn c_atan(z: vec2f) -> vec2f {
 }
 
 fn c_asinh(z: vec2f) -> vec2f {
+	let m = select(-1.0, 1.0, z.x > 0.0 || (z.x == 0.0 && z.y > 0.0));
 	let u = c_sqrt(vec2(1.0, 0.0) + c_mul(z, z));
-	return c_log(u + z);
+	return c_log(u + z*m) * m;
 }
 
 fn c_acosh(z: vec2f) -> vec2f {
-	let u = c_sqrt(vec2(-1.0, 0.0) + c_mul(z, z));
+	let b = select(0.0, TAU, z.x < 0.0 || (z.x == 0.0 && z.y < 0.0));
+	let u = c_sqrtbr(vec2(-1.0, 0.0) + c_mul(z, z), vec2(b, 0.0));
 	return c_log(u + z);
 }
 
 fn c_atanh(z: vec2f) -> vec2f {
-	let u = vec2(1.0, 0.0) + z;
-	let v = vec2(1.0, 0.0) - z;
-	return 0.5 * c_log(c_div(u, v));
+	return 0.5 * (c_log(C_ONE + z) - c_log(C_ONE - z));
 }
 
 // log gamma //
@@ -319,6 +312,56 @@ fn c_digamma_inner2(z: vec2f) -> vec2f {
 	let w = c_digamma_inner(z + vec2(3.0, 0.0));
 	let l = c_recip(z + vec2(2.0, 0.0)) + c_recip(z + vec2(1.0, 0.0)) + c_recip(z);
 	return w - l;
+}
+
+// lambert w //
+
+fn c_lambertw(z: vec2f) -> vec2f {
+	var w = c_lambertw_init(z, 0.0);
+	return c_lambertw_iter(z, w);
+}
+
+fn c_lambertwbr(z: vec2f, br: vec2f) -> vec2f {
+	// branch number
+	let br_n = br.x / TAU;
+
+	// if -TAU/2 < br < TAU/2 then use -1/e as the branch point,
+	// otherwise use 0
+	let branch_point = select(C_ZERO, vec2(-1.0/E, 0.0), abs(br.x) < TAU / 2.0);
+	let arg = c_arg(z - branch_point).x;
+
+	// if we're past the branch cut then take branch ceil(br_n),
+	// otherwise take branch floor(br_n)
+	let take_ceil = (br_n - floor(br_n) >= arg / TAU + 0.5);
+	var init_br = select(floor(br_n), ceil(br_n), take_ceil);
+
+	var w = c_lambertw_init(z, init_br);
+	// newton's method
+	return c_lambertw_iter(z, w);
+}
+
+fn c_lambertw_iter(z: vec2f, init: vec2f) -> vec2f {
+	var w = init;
+	for(var i = 0; i < 5; i++) {
+		w = c_div(c_mul(w, w) + c_mul(z, c_exp(-w)), w + C_ONE);
+	}
+	return w;
+}
+
+fn c_lambertw_init(z: vec2f, br: f32) -> vec2f {
+	let b = vec2(TAU * br, 0.0);
+	let oz = z + vec2(1.25, 0.0);
+	if br == 0.0  && dot(z, z) <= 50.0
+	|| br == 1.0  && z.y < 0.0 && dot(oz, oz) < 1.0
+	|| br == -1.0 && z.y > 0.0 && dot(oz, oz) < 1.0 {
+		// accurate near 0, near principle branch
+		let w = C_ONE + c_sqrtbr(C_ONE + E*z, b);
+		return c_div(c_mul(E*z, c_log(w)), w + E*z);
+	} else {
+		// accurate asymptotically
+		let logz = c_logbr(z, b);
+		return logz - c_log(logz);
+	}
 }
 
 /////////////////

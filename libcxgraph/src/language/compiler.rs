@@ -29,6 +29,11 @@ fn format_char(buf: &mut String, c: char) {
 	match c {
 		'_' => buf.push_str("u_"),
 		'\'' => buf.push_str("p_"),
+		'\u{2080}'..='\u{2089}' => {
+			buf.push('s');
+			buf.push((c as u32 - 0x2080 + '0' as u32).try_into().expect("invalid codepoint"));
+			buf.push('_');
+		}
 		c => buf.push(c),
 	}
 }
@@ -190,6 +195,12 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 					BinaryOp::Mul => writeln!(self.buf, "var {name} = c_mul({a}, {b});")?,
 					BinaryOp::Div => writeln!(self.buf, "var {name} = c_div({a}, {b});")?,
 					BinaryOp::Pow => writeln!(self.buf, "var {name} = c_pow({a}, {b});")?,
+					BinaryOp::Gt => writeln!(self.buf, "var {name} = select(C_ZERO, C_ONE, {a}.x > {b}.x);")?,
+					BinaryOp::Lt => writeln!(self.buf, "var {name} = select(C_ZERO, C_ONE, {a}.x < {b}.x);")?,
+					BinaryOp::Ge => writeln!(self.buf, "var {name} = select(C_ZERO, C_ONE, {a}.x >= {b}.x);")?,
+					BinaryOp::Le => writeln!(self.buf, "var {name} = select(C_ZERO, C_ONE, {a}.x <= {b}.x);")?,
+					BinaryOp::Eq => writeln!(self.buf, "var {name} = select(C_ZERO, C_ONE, ({a}.x == {b}.x) && ({a}.y == {b}.y));")?,
+					BinaryOp::Ne => writeln!(self.buf, "var {name} = select(C_ZERO, C_ONE, ({a}.x != {b}.x) || ({a}.y != {b}.y));")?,
 				}
 
 				Ok(name)
@@ -226,6 +237,19 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 
 				Ok(name)
 			},
+			ExpressionType::If => {
+				let cond = self.compile_expr(local, &expr.children[0])?;
+				let result = local.next_tmp();
+				writeln!(self.buf, "var {result}: vec2f;")?;
+				writeln!(self.buf, "if {cond}.x > 0.0 {{")?;
+				let t = self.compile_expr(local, &expr.children[1])?;
+				writeln!(self.buf, "{result} = {t};")?;
+				writeln!(self.buf, "}} else {{")?;
+				let f = self.compile_expr(local, &expr.children[2])?;
+				writeln!(self.buf, "{result} = {f};")?;
+				writeln!(self.buf, "}}")?;
+				Ok(result)
+			},
 			ExpressionType::Sum { countvar, min, max }
 			| ExpressionType::Prod { countvar, min, max } => {
 				let acc = local.next_tmp();
@@ -239,19 +263,17 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 				writeln!(self.buf, "var {} = vec2f(f32({ivar}), 0.0);", format_local(countvar))?;
 				let mut loop_local = local.clone();
 				loop_local.local_vars.insert(countvar);
-				let mut last = String::new();
-				for child in &expr.children {
-					last = self.compile_expr(&mut loop_local, child)?;
-				}
+				let body = self.compile_expr(&mut loop_local, &expr.children[0])?;
 				if matches!(expr.ty, ExpressionType::Sum { .. }) {
-					writeln!(self.buf, "{acc} = {acc} + {last};\n}}")?;
+					writeln!(self.buf, "{acc} = {acc} + {body};")?;
 				} else {
-					writeln!(self.buf, "{acc} = c_mul({acc}, {last});\n}}")?;
+					writeln!(self.buf, "{acc} = c_mul({acc}, {body});")?;
 				}
+				writeln!(self.buf, "}}")?;
 				Ok(acc)
 			},
 			ExpressionType::Iter { itervar, count } => {
-				let init = expr.children.last().unwrap();
+				let init = &expr.children[0];
 				let itervar_fmt = format_local(itervar);
 				let v = self.compile_expr(local, init)?;
 				writeln!(self.buf, "var {itervar_fmt} = {v};")?;
@@ -259,11 +281,9 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 				writeln!(self.buf, "for(var {ivar}: i32 = 0; {ivar} < {count}; {ivar}++) {{")?;
 				let mut loop_local = local.clone();
 				loop_local.local_vars.insert(itervar);
-				let mut last = String::new();
-				for child in &expr.children[..expr.children.len() - 1] {
-					last = self.compile_expr(&mut loop_local, child)?;
-				}
-				writeln!(self.buf, "{itervar_fmt} = {last};\n}}")?;
+				let body = self.compile_expr(&mut loop_local, &expr.children[1])?;
+				writeln!(self.buf, "{itervar_fmt} = {body};")?;
+				writeln!(self.buf, "}}")?;
 				Ok(itervar_fmt)
 			}
 		}

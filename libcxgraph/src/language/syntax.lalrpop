@@ -21,10 +21,17 @@ extern {
 		"->" => Token::Arrow,
 		"=" => Token::Equal,
 		":" => Token::Colon,
+		">" => Token::Greater,
+		"<" => Token::Less,
+		">=" => Token::GreaterEqual,
+		"<=" => Token::LessEqual,
+		"==" => Token::EqualEqual,
+		"!=" => Token::BangEqual,
 		"\n" => Token::Newline,
 		"sum" => Token::Sum,
 		"prod" => Token::Prod,
 		"iter" => Token::Iter,
+		"if" => Token::If,
 		Float => Token::Float(<f64>),
 		Int => Token::Int(<i32>),
 		Name => Token::Name(<&'input str>),
@@ -60,7 +67,21 @@ Exprs: Vec<Expression<'input>> = {
 Expr: Expression<'input> = Store;
 
 Store: Expression<'input> = {
-	<a:Store> "->" <n:Name> => Expression::new_store(a, n),
+	<a:Equality> "->" <n:Name> => Expression::new_store(a, n),
+	Equality,
+}
+
+Equality: Expression<'input> = {
+	<a:Compare> "==" <b:Compare> => Expression::new_binary(BinaryOp::Eq, a, b),
+	<a:Compare> "!=" <b:Compare> => Expression::new_binary(BinaryOp::Ne, a, b),
+	Compare,
+}
+
+Compare: Expression<'input> = {
+	<a:Sum> ">"  <b:Sum> => Expression::new_binary(BinaryOp::Gt, a, b),
+	<a:Sum> "<"  <b:Sum> => Expression::new_binary(BinaryOp::Lt, a, b),
+	<a:Sum> ">=" <b:Sum> => Expression::new_binary(BinaryOp::Ge, a, b),
+	<a:Sum> "<=" <b:Sum> => Expression::new_binary(BinaryOp::Le, a, b),
 	Sum,
 }
 
@@ -105,17 +126,23 @@ PreJuxtapose: Expression<'input> = {
 	"(" <Expr> ")",
 }
 
+Block: Expression<'input> = {
+	"{" <exs:Exprs> "}" => Expression::new_block(exs),
+}
+
 Item: Expression<'input> = {
 	Number,
 	<n:Name> => Expression::new_name(n),
 	"(" <Expr> ")",
-	"{" <exs:Exprs> "}" => Expression::new_block(exs),
-	"sum" "(" <name:Name> ":" <min:Int> "," <max:Int> ")" "{" <exs:Exprs> "}"
-		=> Expression::new_sum(name, min, max, exs),
-	"prod" "(" <name:Name> ":" <min:Int> "," <max:Int> ")" "{" <exs:Exprs> "}"
-		=> Expression::new_prod(name, min, max, exs),
-	"iter" "(" <count:Int> "," <name:Name> ":" <init:Expr> ")" "{" <exs:Exprs> "}"
-		=> Expression::new_iter(name, count, init, exs),
+	Block,
+	"sum" "(" <name:Name> ":" <min:Int> "," <max:Int> ")" <body:Block>
+		=> Expression::new_sum(name, min, max, body),
+	"prod" "(" <name:Name> ":" <min:Int> "," <max:Int> ")" <body:Block>
+		=> Expression::new_prod(name, min, max, body),
+	"iter" "(" <count:Int> "," <name:Name> ":" <init:Expr> ")" <body:Block>
+		=> Expression::new_iter(name, count, init, body),
+	"if" "(" <cond:Expr> ")" <t:Block> <f:Block>
+		=> Expression::new_if(cond, t, f),
 }
 
 Number: Expression<'input> = {

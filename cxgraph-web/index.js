@@ -4,9 +4,9 @@ import init, * as cxgraph from "./pkg/cxgraph_web.js";
 await init();
 
 let graphView = {
-	xoff: 0,
-	yoff: 0,
-	scale: 3,
+	xoff: 0.00001,
+	yoff: 0.00001,
+	scale: 2.99932736,
 	res_mult: 1,
 	varNames: [],
 };
@@ -217,13 +217,23 @@ let charMap = {
 	"Psi":      "\u03a8",
 	"Omega":    "\u03a9",
 	"vartheta": "\u03d1",
+	"0":        "\u2080",
+	"1":        "\u2081",
+	"2":        "\u2082",
+	"3":        "\u2083",
+	"4":        "\u2084",
+	"5":        "\u2085",
+	"6":        "\u2086",
+	"7":        "\u2087",
+	"8":        "\u2088",
+	"9":        "\u2089",
 };
 let specialChars = new RegExp(
 	`\\\\(${Object.keys(charMap).join("|")})`
 );
-console.log(specialChars);
 
-source_text.addEventListener("input", () => {
+source_text.addEventListener("input", (event) => {
+	if(event.isComposing) return;
 	let e = source_text.selectionEnd;
 	let amnt = 0;
 	source_text.value = source_text.value.replace(

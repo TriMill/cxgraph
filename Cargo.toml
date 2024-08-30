@@ -5,4 +5,4 @@ members = [
 	"cxgraph-desktop",
 	"cxgraph-web",
 ]
-
+resolver = "2"

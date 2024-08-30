@@ -13,6 +13,7 @@ lalrpop-util = { version = "0.20.0", features = ["lexer", "unicode"] }
 num-complex = "0.4"
 wgpu = "0.16"
 raw-window-handle = "0.5"
+unicode-xid = "0.2"
 
 [build-dependencies]
 lalrpop = "0.20.0"
