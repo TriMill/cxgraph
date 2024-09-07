@@ -1,6 +1,6 @@
 use std::{num::NonZeroU64, io::Cursor};
 
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt, MemoryHints};
 
 #[derive(Debug)]
 #[repr(C)]
@@ -37,9 +37,9 @@ impl Uniforms {
 	}
 }
 
-pub struct WgpuState {
+pub struct WgpuState<'a> {
 	pub uniforms: Uniforms,
-	surface: wgpu::Surface,
+	surface: wgpu::Surface<'a>,
 	device: wgpu::Device,
 	config: wgpu::SurfaceConfiguration,
 	render_pipeline: Option<wgpu::RenderPipeline>,
@@ -49,12 +49,12 @@ pub struct WgpuState {
 	queue: wgpu::Queue
 }
 
-impl WgpuState {
-	pub async fn new<W>(window: &W, size: (u32, u32)) -> Self
-	where W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle {
+impl<'a> WgpuState<'a> {
+	pub async fn new<W>(window: &'a W, size: (u32, u32)) -> Self
+	where W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle + Sync {
 
 		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
-		let surface = unsafe { instance.create_surface(&window) }.unwrap();
+		let surface = instance.create_surface(window).unwrap();
 
 		let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
 			power_preference: wgpu::PowerPreference::default(),
@@ -65,8 +65,12 @@ impl WgpuState {
 		let (device, queue) = adapter.request_device(
 			&wgpu::DeviceDescriptor {
 				label: None,
-				features: wgpu::Features::empty(),
-				limits: wgpu::Limits::downlevel_webgl2_defaults(),
+				required_features: wgpu::Features::empty(),
+				required_limits: wgpu::Limits {
+                    max_texture_dimension_2d: 8192,
+                    ..wgpu::Limits::downlevel_webgl2_defaults()
+                },
+                memory_hints: MemoryHints::Performance,
 			},
 			None
 		).await.map_err(|e| e.to_string()).unwrap();
@@ -81,6 +85,7 @@ impl WgpuState {
 			present_mode: wgpu::PresentMode::Fifo,
 			alpha_mode: wgpu::CompositeAlphaMode::Auto,
 			view_formats: vec![format],
+            desired_maximum_frame_latency: 2,
 		};
 		surface.configure(&device, &config);
 
@@ -168,12 +173,14 @@ impl WgpuState {
 		let vertex = wgpu::VertexState {
 			module: &vertex_module,
 			entry_point: "main",
+            compilation_options: Default::default(),
 			buffers: &[]
 		};
 
 		let fragment = wgpu::FragmentState {
 			module: &fragment_module,
 			entry_point: "main",
+            compilation_options: Default::default(),
 			targets: &[Some(wgpu::ColorTargetState {
 				format: self.config.format,
 				blend: Some(wgpu::BlendState {
@@ -201,6 +208,7 @@ impl WgpuState {
 			depth_stencil: None,
 			multisample: wgpu::MultisampleState::default(),
 			multiview: None,
+            cache: None,
 		});
 
 		self.render_pipeline = Some(render_pipeline);
@@ -216,7 +224,7 @@ impl WgpuState {
 				resolve_target: None,
 				ops: wgpu::Operations {
 					load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-					store: true,
+					store: wgpu::StoreOp::Store,
 				}
 			};
 
@@ -224,6 +232,8 @@ impl WgpuState {
 				label: None,
 				color_attachments: &[Some(color_attachment)],
 				depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
 			});
 			if let Some(pipeline) = &self.render_pipeline {
 				rpass.set_pipeline(pipeline);

@@ -1,7 +1,16 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-	<title>cxgraph</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<meta name="author" content="trimill">
+	<meta name="description" content="Plot complex functions">
+	<meta property="og:description" content="Plot complex functions">
+	<meta property="og:title" content="CXGraph">
+	<meta property="og:site_name" content="cx.trimill.xyz">
+
+	<title>CXGraph</title>
 	<link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,8 +21,8 @@
 			<line id="svg_axis_y" x1="0" y1="0" x2="0" y2="0" stroke="#0006" stroke-width="1.5" visibility="hidden" />
 			<circle id="svg_unitcircle" cx="0" cy="0" r="0" stroke="#0006" fill="none" stroke-width="1.5" visibility="hidden" />
 			<g id="svg_point_template" visibility="hidden">
-				<circle cx="0" cy="0" r="15" stroke="none" fill="#6664" />
-				<circle cx="0" cy="0" r="5" stroke="none" fill="#6666" />
+				<circle cx="0" cy="0" r="15" stroke="none" fill="#3337" />
+				<circle cx="0" cy="0" r="5" stroke="none" fill="#dddc" />
 			</g>
 			<g id="overlay_points">
 			</g>
@@ -32,7 +41,7 @@
 			</div>
 
 			<div id="div_error_msg" hidden></div>
-			<div><textarea id="source_text">f(z) = z^2 + 3i&#10;plot(z) = 5z^2 + f(1/z) - 1</textarea></div>
+			<div><textarea id="source_text">f(z) = 6z^2 - 2i - 1&#10;plot(z) = f(1 + sin(z)) / 8</textarea></div>
 		</details>
 
 		<div>
@@ -50,11 +59,6 @@
 			<div>
 				<div><label for="range_shading">Shading intensity</label></div>
 				<input type="range" id="range_shading" min="0" max="1" step="0.01" value="0.3">
-			</div>
-
-			<div>
-				<div><label for="range_contour">Contour intensity</label></div>
-				<input type="range" id="range_contour" min="0" max="1" step="0.01" value="0.0">
 			</div>
 
 			<div>
@@ -77,11 +81,16 @@
 					<input type="checkbox" class="decor" id="checkbox_decor_8" data-value="8">
 					<label for="checkbox_decor_8">Magnitude contours</label>
 				</div>
+
+				<div>
+					<div><label for="range_contour">Contour intensity</label></div>
+					<input type="range" id="range_contour" min="0" max="1" step="0.01" value="0.0">
+				</div>
 			</div>
 
 			<div>
 				<div>Coloring</div>
-				<input type="radio" name="color_mode" id="radio_color_0" data-value="0" checked>
+				<input type="radio" name="color_mode" id="radio_color_0" data-value="0">
 				<label for="radio_color_0">Standard</label><br>
 				<input type="radio" name="color_mode" id="radio_color_1" data-value="1">
 				<label for="radio_color_1">Uniform</label><br>
@@ -106,7 +115,7 @@
 			<summary>Variables</summary>
 			<div id="slider_template" hidden>
 				<div>
-					<input type="text" class="var-name" style="width: 5ch;"">
+					<input type="text" class="var-name" style="width: 5ch;" placeholder="a">
 					=
 					<input type="number" class="var-value" style="width: 10ch;" value="0" required>
 					<input type="button" class="var-delete" value="X">
@@ -122,7 +131,7 @@
 				<hr>
 			</div>
 			<div id="point_template" hidden>
-				<input type="text" class="var-name" style="width: 5ch;">
+				<input type="text" class="var-name" style="width: 5ch;" placeholder="b">
 				=
 				<input type="number" class="var-value-re" style="width: 8ch;" required value="0">
 				+
@@ -140,7 +149,9 @@
 	</div>
 
 	<script>
-		import('./index.js').then(m => window.module = m)
+		window.modules = {};
+		import('./index.js').then(m => window.modules.index = m);
+		import('./editor.js').then(m => window.modules.editor = m);
 	</script>
 </body>
 </html>

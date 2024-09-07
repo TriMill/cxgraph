@@ -23,9 +23,9 @@ pub enum ExpressionType<'a> {
 	FnCall(&'a str),
 	Store(&'a str),
 	If,
-	Sum { countvar: &'a str, min: i32, max: i32 },
-	Prod { countvar: &'a str, min: i32, max: i32 },
-	Iter { itervar: &'a str, count: i32 },
+	Sum { countvar: &'a str },
+	Prod { countvar: &'a str },
+	Iter { itervar: &'a str },
 }
 
 #[derive(Clone, Debug)]
@@ -70,24 +70,24 @@ impl<'a> Expression<'a> {
 		}
 	}
 
-	pub fn new_sum(countvar: &'a str, min: i32, max: i32, body: Self) -> Self {
+	pub fn new_sum(countvar: &'a str, min: Self, max: Self, body: Self) -> Self {
 		Self {
-			ty: ExpressionType::Sum { countvar, min, max },
-			children: vec![body],
+			ty: ExpressionType::Sum { countvar },
+			children: vec![min, max, body],
 		}
 	}
 
-	pub fn new_prod(accvar: &'a str, min: i32, max: i32, body: Self) -> Self {
+	pub fn new_prod(countvar: &'a str, min: Self, max: Self, body: Self) -> Self {
 		Self {
-			ty: ExpressionType::Prod { countvar: accvar, min, max },
-			children: vec![body],
+			ty: ExpressionType::Prod { countvar },
+			children: vec![min, max, body],
 		}
 	}
 
-	pub fn new_iter(itervar: &'a str, count: i32, init: Self, body: Self) -> Self {
+	pub fn new_iter(itervar: &'a str, count: Self, init: Self, body: Self) -> Self {
 		Self {
-			ty: ExpressionType::Iter { itervar, count },
-			children: vec![init, body],
+			ty: ExpressionType::Iter { itervar },
+			children: vec![count, init, body],
 		}
 	}
 }
@@ -108,9 +108,9 @@ fn display_expr(w: &mut impl fmt::Write, expr: &Expression, depth: usize) -> fmt
 		ExpressionType::FnCall(f) => write!(w, "{:indent$}CALL {f}", "", indent=indent)?,
 		ExpressionType::Store(n) => write!(w, "{:indent$}STORE {n}", "", indent=indent)?,
 		ExpressionType::If => write!(w, "{:indent$}IF", "", indent=indent)?,
-		ExpressionType::Sum { countvar, min, max } => write!(w, "{:indent$}SUM {countvar} {min} {max}", "", indent=indent)?,
-		ExpressionType::Prod { countvar, min, max } => write!(w, "{:indent$}PROD {countvar} {min} {max}", "", indent=indent)?,
-		ExpressionType::Iter { itervar, count } => write!(w, "{:indent$}ITER {itervar} {count}", "", indent=indent)?,
+		ExpressionType::Sum { countvar } => write!(w, "{:indent$}SUM {countvar}", "", indent=indent)?,
+		ExpressionType::Prod { countvar } => write!(w, "{:indent$}PROD {countvar}", "", indent=indent)?,
+		ExpressionType::Iter { itervar } => write!(w, "{:indent$}ITER {itervar}", "", indent=indent)?,
 	}
 	writeln!(w)?;
 	for child in &expr.children {

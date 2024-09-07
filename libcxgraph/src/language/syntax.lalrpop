@@ -32,8 +32,7 @@ extern {
 		"prod" => Token::Prod,
 		"iter" => Token::Iter,
 		"if" => Token::If,
-		Float => Token::Float(<f64>),
-		Int => Token::Int(<i32>),
+		Number => Token::Number(<f64>),
 		Name => Token::Name(<&'input str>),
 	}
 }
@@ -122,7 +121,7 @@ FnCall: Expression<'input> = {
 }
 
 PreJuxtapose: Expression<'input> = {
-	Number,
+	<n:Number> => Expression::new_number(n),
 	"(" <Expr> ")",
 }
 
@@ -131,21 +130,16 @@ Block: Expression<'input> = {
 }
 
 Item: Expression<'input> = {
-	Number,
+	<n:Number> => Expression::new_number(n),
 	<n:Name> => Expression::new_name(n),
 	"(" <Expr> ")",
 	Block,
-	"sum" "(" <name:Name> ":" <min:Int> "," <max:Int> ")" <body:Block>
+	"sum" "(" <name:Name> ":" <min:Expr> "," <max:Expr> ")" <body:Block>
 		=> Expression::new_sum(name, min, max, body),
-	"prod" "(" <name:Name> ":" <min:Int> "," <max:Int> ")" <body:Block>
+	"prod" "(" <name:Name> ":" <min:Expr> "," <max:Expr> ")" <body:Block>
 		=> Expression::new_prod(name, min, max, body),
-	"iter" "(" <count:Int> "," <name:Name> ":" <init:Expr> ")" <body:Block>
+	"iter" "(" <count:Expr> "," <init:Equality> "->" <name:Name> ")" <body:Block>
 		=> Expression::new_iter(name, count, init, body),
 	"if" "(" <cond:Expr> ")" <t:Block> <f:Block>
 		=> Expression::new_if(cond, t, f),
-}
-
-Number: Expression<'input> = {
-	<n:Float> => Expression::new_number(n),
-	<n:Int> => Expression::new_number(n as f64),
 }

@@ -5,8 +5,7 @@ use unicode_xid::UnicodeXID;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Token<'i> {
-	Float(f64),
-	Int(i32),
+	Number(f64),
 	Name(&'i str),
 	Sum, Prod, Iter, If,
 	LParen, RParen,
@@ -21,8 +20,7 @@ pub enum Token<'i> {
 impl<'i> fmt::Display for Token<'i> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
-			Token::Float(n) => write!(f, "{n}"),
-			Token::Int(n) => write!(f, "{n}"),
+			Token::Number(n) => write!(f, "{n}"),
 			Token::Name(n) => write!(f, "{n}"),
 			Token::Sum     => f.write_str("sum"),
 			Token::Prod    => f.write_str("prod"),
@@ -94,7 +92,7 @@ impl<'i> Lexer<'i> {
 	 }
 	}
 
-	fn next_number(&mut self, i: usize, mut has_dot: bool) -> Spanned<Token<'i>, usize, LexerError> {
+	fn next_number(&mut self, i: usize, has_dot: bool) -> Spanned<Token<'i>, usize, LexerError> {
 		let mut j = i;
 
 		while self.chars.peek().is_some_and(|(_, c)| c.is_ascii_digit()) {
@@ -103,20 +101,14 @@ impl<'i> Lexer<'i> {
 
 		if !has_dot && matches!(self.chars.peek(), Some((_, '.'))) {
 			j = self.chars.next().unwrap().0;
-			has_dot = true;
 			while self.chars.peek().is_some_and(|(_, c)| c.is_ascii_digit()) {
 				j = self.chars.next().unwrap().0;
 			}
 		}
 
 		let s = &self.src[i..j+1];
-		if !has_dot {
-			if let Ok(n) = s.parse::<i32>() {
-				return Ok((i, Token::Int(n), j+1))
-			}
-		}
 		match s.parse::<f64>() {
-			Ok(n) => Ok((i, Token::Float(n), j+1)),
+			Ok(n) => Ok((i, Token::Number(n), j+1)),
 			Err(_) => Err(LexerError::InvalidNumber(i, j+1)),
 		}
 	}

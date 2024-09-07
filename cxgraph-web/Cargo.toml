@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 libcxgraph = { path = "../libcxgraph", features = ["webgl"] }
 log = "0.4"
-winit = "0.28"
+winit = "0.29"
 console_error_panic_hook = "0.1"
 console_log = "1.0"
 wasm-bindgen = "0.2"

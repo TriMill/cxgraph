@@ -250,8 +250,15 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 				writeln!(self.buf, "}}")?;
 				Ok(result)
 			},
-			ExpressionType::Sum { countvar, min, max }
-			| ExpressionType::Prod { countvar, min, max } => {
+			ExpressionType::Sum { countvar }
+			| ExpressionType::Prod { countvar } => {
+                let min = local.next_tmp();
+                let max = local.next_tmp();
+				let v = self.compile_expr(local, &expr.children[0])?;
+				writeln!(self.buf, "var {min} = i32(floor({v}.x));")?;
+				let v = self.compile_expr(local, &expr.children[1])?;
+				writeln!(self.buf, "var {max} = i32(floor({v}.x));")?;
+
 				let acc = local.next_tmp();
 				let ivar = local.next_tmp();
 				if matches!(expr.ty, ExpressionType::Sum { .. }) {
@@ -259,11 +266,11 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 				} else {
 					writeln!(self.buf, "var {acc} = vec2f(1.0, 0.0);")?;
 				}
-				writeln!(self.buf, "for(var {ivar}: i32 = {min}; {ivar} <= {max}; {ivar}++) {{")?;
+				writeln!(self.buf, "for(var {ivar} = {min}; {ivar} <= {max}; {ivar}++) {{")?;
 				writeln!(self.buf, "var {} = vec2f(f32({ivar}), 0.0);", format_local(countvar))?;
 				let mut loop_local = local.clone();
 				loop_local.local_vars.insert(countvar);
-				let body = self.compile_expr(&mut loop_local, &expr.children[0])?;
+				let body = self.compile_expr(&mut loop_local, &expr.children[2])?;
 				if matches!(expr.ty, ExpressionType::Sum { .. }) {
 					writeln!(self.buf, "{acc} = {acc} + {body};")?;
 				} else {
@@ -272,16 +279,21 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 				writeln!(self.buf, "}}")?;
 				Ok(acc)
 			},
-			ExpressionType::Iter { itervar, count } => {
-				let init = &expr.children[0];
+			ExpressionType::Iter { itervar } => {
+                let countvar = local.next_tmp();
+				let v = self.compile_expr(local, &expr.children[0])?;
+				writeln!(self.buf, "var {countvar} = i32(floor({v}.x));")?;
+
+				let init = &expr.children[1];
 				let itervar_fmt = format_local(itervar);
 				let v = self.compile_expr(local, init)?;
 				writeln!(self.buf, "var {itervar_fmt} = {v};")?;
+
 				let ivar = local.next_tmp();
-				writeln!(self.buf, "for(var {ivar}: i32 = 0; {ivar} < {count}; {ivar}++) {{")?;
+				writeln!(self.buf, "for(var {ivar}: i32 = 0; {ivar} < {countvar}; {ivar}++) {{")?;
 				let mut loop_local = local.clone();
 				loop_local.local_vars.insert(itervar);
-				let body = self.compile_expr(&mut loop_local, &expr.children[1])?;
+				let body = self.compile_expr(&mut loop_local, &expr.children[2])?;
 				writeln!(self.buf, "{itervar_fmt} = {body};")?;
 				writeln!(self.buf, "}}")?;
 				Ok(itervar_fmt)

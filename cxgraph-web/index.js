@@ -12,7 +12,6 @@ let graphView = {
 };
 
 let graphPoints = [];
-let graphSliders = [];
 
 let mouseX = 0.0;
 let mouseY = 0.0;
@@ -111,20 +110,20 @@ function onWheel(e) {
 	onViewChange();
 }
 
-function onMouseDown(e) {
+function onPointerDown(e) {
 	mousePressed = true;
 	mouseX = e.offsetX;
 	mouseY = e.offsetY;
 }
 
-function onMouseUp(e) {
+function onPointerUp() {
 	mousePressed = false;
 	for(let point of graphPoints) {
 		point.mousePressed = false;
 	}
 }
 
-function onMouseMove(e) {
+function onPointerMove(e) {
 	if(mousePressed) {
 		let dX = e.offsetX - mouseX;
 		let dY = e.offsetY - mouseY;
@@ -135,16 +134,16 @@ function onMouseMove(e) {
 		onViewChange();
 	} else {
 		for(let point of graphPoints) {
-			point.onMouseMove(e);
+			point.onPointerMove(e);
 		}
 	}
 }
 
 window.addEventListener("resize", onResize);
 canvas.addEventListener("wheel", onWheel);
-canvas.addEventListener("mousedown", onMouseDown);
-canvas.addEventListener("mouseup", onMouseUp);
-canvas.addEventListener("mousemove", onMouseMove);
+canvas.addEventListener("pointerdown", onPointerDown);
+canvas.addEventListener("pointerup", onPointerUp);
+canvas.addEventListener("pointermove", onPointerMove);
 
 //
 // Graph/redraw
@@ -165,86 +164,6 @@ function onGraph() {
 
 button_graph.addEventListener("click", onGraph);
 button_redraw.addEventListener("click", redraw);
-
-let charMap = {
-	"alpha":    "\u03b1",
-	"beta":     "\u03b2",
-	"gamma":    "\u03b3",
-	"delta":    "\u03b4",
-	"epsilon":  "\u03b5",
-	"zeta":     "\u03b6",
-	"eta":      "\u03b7",
-	"theta":    "\u03b8",
-	"iota":     "\u03b9",
-	"kappa":    "\u03ba",
-	"lambda":   "\u03bb",
-	"mu":       "\u03bc",
-	"nu":       "\u03bd",
-	"xi":       "\u03be",
-	"omicron":  "\u03bf",
-	"pi":       "\u03c0",
-	"rho":      "\u03c1",
-	"fsigma":   "\u03c2",
-	"sigma":    "\u03c3",
-	"tau":      "\u03c4",
-	"upsilon":  "\u03c5",
-	"phi":      "\u03c6",
-	"chi":      "\u03c7",
-	"psi":      "\u03c8",
-	"omega":    "\u03c9",
-	"Alpha":    "\u0391",
-	"Beta":     "\u0392",
-	"Gamma":    "\u0393",
-	"Delta":    "\u0394",
-	"Epsilon":  "\u0395",
-	"Zeta":     "\u0396",
-	"Eta":      "\u0397",
-	"Theta":    "\u0398",
-	"Iota":     "\u0399",
-	"Kappa":    "\u039a",
-	"Lambda":   "\u039b",
-	"Mu":       "\u039c",
-	"Nu":       "\u039d",
-	"Xi":       "\u039e",
-	"Omicron":  "\u039f",
-	"Pi":       "\u03a0",
-	"Rho":      "\u03a1",
-	"Sigma":    "\u03a3",
-	"Tau":      "\u03a4",
-	"Upsilon":  "\u03a5",
-	"Phi":      "\u03a6",
-	"Chi":      "\u03a7",
-	"Psi":      "\u03a8",
-	"Omega":    "\u03a9",
-	"vartheta": "\u03d1",
-	"0":        "\u2080",
-	"1":        "\u2081",
-	"2":        "\u2082",
-	"3":        "\u2083",
-	"4":        "\u2084",
-	"5":        "\u2085",
-	"6":        "\u2086",
-	"7":        "\u2087",
-	"8":        "\u2088",
-	"9":        "\u2089",
-};
-let specialChars = new RegExp(
-	`\\\\(${Object.keys(charMap).join("|")})`
-);
-
-source_text.addEventListener("input", (event) => {
-	if(event.isComposing) return;
-	let e = source_text.selectionEnd;
-	let amnt = 0;
-	source_text.value = source_text.value.replace(
-		specialChars,
-		(m, p) => {
-			amnt += m.length - charMap[p].length;
-			return charMap[p];
-		}
-	);
-	source_text.selectionEnd = e - amnt;
-});
 
 //
 // Options
@@ -298,7 +217,8 @@ for(let e of nameColorMode) {
 	});
 	e.checked = false;
 }
-nameColorMode[0].checked = true;
+nameColorMode[1].checked = true;
+cxgraph.set_coloring(1);
 
 overlay_axes.addEventListener("change", () => {
 	let vis = overlay_axes.checked ? "visible" : "hidden";
@@ -429,24 +349,24 @@ class Point {
 			tryRedraw();
 		});
 
-		svgPoint.addEventListener("mousedown", (e) => {
+		svgPoint.addEventListener("pointerdown", (e) => {
 			this.mousePressed = true;
 			mouseX = e.offsetX;
 			mouseY = e.offsetY;
 		});
 
-		svgPoint.addEventListener("mouseup", () => {
+		svgPoint.addEventListener("pointerup", () => {
 			this.mousePressed = false;
 			mousePressed = false;
 		});
 
-		svgPoint.addEventListener("mousemove", (e) => this.onMouseMove(e));
+		svgPoint.addEventListener("pointermove", (e) => this.onPointerMove(e));
 
 		this.onViewChange();
 		genVarNames();
 	}
 
-	onMouseMove(e) {
+	onPointerMove(e) {
 		if(this.mousePressed) {
 			mouseX = e.offsetX;
 			mouseY = e.offsetY;
@@ -496,3 +416,5 @@ onGraph();
 export function show_ast() {
 	console.info(cxgraph.show_shader_ast(source_text.value));
 }
+
+export function get_cxgraph() { return cxgraph; }

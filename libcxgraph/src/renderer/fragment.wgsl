@@ -364,6 +364,30 @@ fn c_lambertw_init(z: vec2f, br: f32) -> vec2f {
 	}
 }
 
+fn c_erf(z: vec2f) -> vec2f {
+	if z.x >= 0 {
+		return c_erf_plus(z);
+	} else {
+		return -c_erf_plus(-z);
+	}
+}
+
+const ERF_P = 0.3275911;
+const ERF_A1 = 0.2548295922;
+const ERF_A2 = -0.2844967358;
+const ERF_A3 = 1.4214137412;
+const ERF_A4 = -1.4531520268;
+const ERF_A5 = 1.0614054292;
+fn c_erf_plus(z: vec2f) -> vec2f {
+	let t = c_recip(vec2(1.0, 0.0) + ERF_P * z);
+	let m = c_exp(-c_mul(z, z));
+	let r = c_mul(t, vec2f(ERF_A1, 0.0)
+		+ c_mul(t, vec2f(ERF_A2, 0.0)
+			+ c_mul(t, vec2f(ERF_A3, 0.0)
+				+ c_mul(t, vec2f(ERF_A4, 0.0) + t * ERF_A5))));
+	return vec2f(1.0, 0.0) - c_mul(m, r);
+}
+
 /////////////////
 //  rendering  //
 /////////////////

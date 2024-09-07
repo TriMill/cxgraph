@@ -20,7 +20,6 @@ where F: Fn(&mut WgpuState) {
 #[wasm_bindgen(start)]
 pub async fn start() {
 	use winit::dpi::PhysicalSize;
-	use winit::platform::web::WindowExtWebSys;
 
 	std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 	console_log::init_with_level(log::Level::Info).expect("Couldn't initialize logger");
@@ -34,16 +33,18 @@ pub async fn start() {
 		.dyn_into()
 		.expect("Canvas was not a canvas");
 
-	let event_loop = EventLoop::new();
+	let event_loop = EventLoop::new().unwrap();
 	let window = WindowBuilder::new()
 		.with_canvas(Some(canvas))
+        .with_prevent_default(false)
 		.with_inner_size(PhysicalSize::new(100, 100))
 		.with_title("window")
 		.build(&event_loop)
 		.expect("Failed to build window");
 
-	let size = window.inner_size();
-	let mut state = WgpuState::new(&window, size.into()).await;
+    let window_ref = Box::leak(Box::new(window));
+
+	let mut state = WgpuState::new(window_ref, (100, 100)).await;
 	state.uniforms.bounds_min = (-5.0, -5.0).into();
 	state.uniforms.bounds_max = ( 5.0,  5.0).into();
 	state.uniforms.shading_intensity = 0.3;

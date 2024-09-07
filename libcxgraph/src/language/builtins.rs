@@ -60,6 +60,7 @@ thread_local! {
 		m.insert("\u{03C8}",    ("c_digamma",    1));
 		m.insert("lambertw",    ("c_lambertw",   1));
 		m.insert("lambertwbr",  ("c_lambertwbr", 2));
+		m.insert("erf",         ("c_erf",        1));
 
 		m
 	};
