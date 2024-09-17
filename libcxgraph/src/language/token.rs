@@ -7,7 +7,7 @@ use unicode_xid::UnicodeXID;
 pub enum Token<'i> {
 	Number(f64),
 	Name(&'i str),
-	Sum, Prod, Iter, If,
+	Sum, Prod, Iter, If, While,
 	LParen, RParen,
 	LBrace, RBrace,
 	Plus, Minus, Star, Slash, Caret,
@@ -26,6 +26,7 @@ impl<'i> fmt::Display for Token<'i> {
 			Token::Prod    => f.write_str("prod"),
 			Token::Iter    => f.write_str("iter"),
 			Token::If      => f.write_str("if"),
+			Token::While   => f.write_str("while"),
 			Token::LParen  => f.write_str("("),
 			Token::RParen  => f.write_str(")"),
 			Token::LBrace  => f.write_str("{"),
@@ -124,6 +125,7 @@ impl<'i> Lexer<'i> {
 			"prod"    => Ok((i, Token::Prod,    j)),
 			"iter"    => Ok((i, Token::Iter,    j)),
 			"if"      => Ok((i, Token::If,      j)),
+			"while"   => Ok((i, Token::While,   j)),
 			_ => Ok((i, Token::Name(s), j)),
 		}
 	}

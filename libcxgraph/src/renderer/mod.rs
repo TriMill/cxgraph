@@ -1,6 +1,6 @@
 use std::{num::NonZeroU64, io::Cursor};
 
-use wgpu::{util::DeviceExt, MemoryHints};
+use wgpu::util::DeviceExt;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -9,11 +9,12 @@ pub struct Uniforms {
 	pub resolution: (u32, u32),
 	pub bounds_min: (f32, f32),
 	pub bounds_max: (f32, f32),
+    pub res_scale: f32,
 	pub shading_intensity: f32,
 	pub contour_intensity: f32,
 	pub decorations: u32,
 	pub coloring: u32,
-	_padding: [u8; 8],
+    pub grid_mode: u32,
 }
 
 const UNIFORM_SIZE: usize = std::mem::size_of::<Uniforms>();
@@ -29,10 +30,12 @@ impl Uniforms {
 		buf.write_all(&self.bounds_min.1.to_le_bytes())?;
 		buf.write_all(&self.bounds_max.0.to_le_bytes())?;
 		buf.write_all(&self.bounds_max.1.to_le_bytes())?;
+		buf.write_all(&self.res_scale.to_le_bytes())?;
 		buf.write_all(&self.shading_intensity.to_le_bytes())?;
 		buf.write_all(&self.contour_intensity.to_le_bytes())?;
 		buf.write_all(&self.decorations.to_le_bytes())?;
 		buf.write_all(&self.coloring.to_le_bytes())?;
+		buf.write_all(&self.grid_mode.to_le_bytes())?;
 		Ok(())
 	}
 }
@@ -70,11 +73,11 @@ impl<'a> WgpuState<'a> {
                     max_texture_dimension_2d: 8192,
                     ..wgpu::Limits::downlevel_webgl2_defaults()
                 },
-                memory_hints: MemoryHints::Performance,
+                memory_hints: wgpu::MemoryHints::default(),
 			},
 			None
 		).await.map_err(|e| e.to_string()).unwrap();
-
+        
 		let format = surface.get_capabilities(&adapter).formats[0];
 
 		let config = wgpu::SurfaceConfiguration {
@@ -135,11 +138,12 @@ impl<'a> WgpuState<'a> {
 			resolution: size.into(),
 			bounds_min: (-0.0, -0.0),
 			bounds_max: ( 0.0,  0.0),
+            res_scale: 1.0,
 			shading_intensity: 0.0,
 			contour_intensity: 0.0,
 			decorations: 0,
 			coloring: 0,
-			_padding: [0; 8],
+            grid_mode: 0,
 		};
 
 		Self {
@@ -239,7 +243,6 @@ impl<'a> WgpuState<'a> {
 				rpass.set_pipeline(pipeline);
 				rpass.set_bind_group(0, &self.uniform_bind_group, &[]);
 				rpass.draw(0..3, 0..1);
-				rpass.draw(1..4, 0..1);
 			}
 		}
 		let mut cursor = Cursor::new([0; UNIFORM_SIZE]);

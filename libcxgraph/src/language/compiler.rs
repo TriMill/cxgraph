@@ -250,6 +250,20 @@ impl<'w, 'i, W: fmt::Write> Compiler<'w, 'i, W> {
 				writeln!(self.buf, "}}")?;
 				Ok(result)
 			},
+            ExpressionType::While => {
+				let res = local.next_tmp();
+				writeln!(self.buf, "var {res}: vec2f;")?;
+				writeln!(self.buf, "loop {{")?;
+
+                let cond = self.compile_expr(local, &expr.children[0])?;
+				writeln!(self.buf, "if {cond}.x <= 0.0 {{ break; }}")?;
+
+				let mut loop_local = local.clone();
+                let body = self.compile_expr(&mut loop_local, &expr.children[1])?;
+                writeln!(self.buf, "{res} = {body};")?;
+				writeln!(self.buf, "}}")?;
+				Ok(res)
+            }
 			ExpressionType::Sum { countvar }
 			| ExpressionType::Prod { countvar } => {
                 let min = local.next_tmp();

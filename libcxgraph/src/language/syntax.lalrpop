@@ -32,6 +32,7 @@ extern {
 		"prod" => Token::Prod,
 		"iter" => Token::Iter,
 		"if" => Token::If,
+		"while" => Token::While,
 		Number => Token::Number(<f64>),
 		Name => Token::Name(<&'input str>),
 	}
@@ -142,4 +143,6 @@ Item: Expression<'input> = {
 		=> Expression::new_iter(name, count, init, body),
 	"if" "(" <cond:Expr> ")" <t:Block> <f:Block>
 		=> Expression::new_if(cond, t, f),
+	"while" "(" <cond:Expr> ")" <body:Block>
+		=> Expression::new_while(cond, body),
 }

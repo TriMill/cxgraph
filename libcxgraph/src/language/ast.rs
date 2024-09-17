@@ -22,7 +22,7 @@ pub enum ExpressionType<'a> {
 	Unary(UnaryOp),
 	FnCall(&'a str),
 	Store(&'a str),
-	If,
+	If, While,
 	Sum { countvar: &'a str },
 	Prod { countvar: &'a str },
 	Iter { itervar: &'a str },
@@ -70,6 +70,13 @@ impl<'a> Expression<'a> {
 		}
 	}
 
+	pub fn new_while(cond: Self, body: Self) -> Self {
+		Self {
+			ty: ExpressionType::While,
+			children: vec![cond, body],
+		}
+	}
+
 	pub fn new_sum(countvar: &'a str, min: Self, max: Self, body: Self) -> Self {
 		Self {
 			ty: ExpressionType::Sum { countvar },
@@ -108,6 +115,7 @@ fn display_expr(w: &mut impl fmt::Write, expr: &Expression, depth: usize) -> fmt
 		ExpressionType::FnCall(f) => write!(w, "{:indent$}CALL {f}", "", indent=indent)?,
 		ExpressionType::Store(n) => write!(w, "{:indent$}STORE {n}", "", indent=indent)?,
 		ExpressionType::If => write!(w, "{:indent$}IF", "", indent=indent)?,
+		ExpressionType::While => write!(w, "{:indent$}WHILE", "", indent=indent)?,
 		ExpressionType::Sum { countvar } => write!(w, "{:indent$}SUM {countvar}", "", indent=indent)?,
 		ExpressionType::Prod { countvar } => write!(w, "{:indent$}PROD {countvar}", "", indent=indent)?,
 		ExpressionType::Iter { itervar } => write!(w, "{:indent$}ITER {itervar}", "", indent=indent)?,

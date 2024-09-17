@@ -67,7 +67,8 @@ variable on the right.
 
 The equality operators `==` and `!=` compare two values, considering both their
 real and imaginary components. The comparison operators `>`, `<`, `>=`, and `<=`
-only consider the real component.
+only consider the real component. These all produce `0` if the equality or comparison
+is false and `1` if it is true.
 
 `+`, `-`, and `*` also function as the unary plus, minus, and conugation operators.
 
@@ -111,6 +112,12 @@ if(z > 0) { z^2 } { 2z }
 If the argument's real part is positive, the first body will be evaluated, and otherwise the
 second will be.
 
+`while` can be used to repeat while a condition is met. Care should be taken to ensure the loop will always end eventually.
+
+```
+0 -> n, while(n < 10) { n + 1 -> n }
+```
+
 
 ## Built-in functions and constants
 
@@ -137,6 +144,9 @@ power/exponential functions:
 |----------------|-------------------------------------------|
 | `exp(z)`       | Exponential function, equivalent to `e^z` |
 | `log(z)`       | Natural logarithm                         |
+| `log2(z)`      | Logarithm base 2                          |
+| `log10(z)`     | Logarithm base 10                         |
+| `logb(b,z)`    | Logarithm base b                          |
 | `logbr(z,br)`  | Natural logarithm with specified branch   |
 | `pow(z)`       | Power, equivalent to `^`                  |
 | `powbr(z,br)`  | `pow` with specified branch               |
@@ -180,6 +190,11 @@ logic functions:
 | `absre(z)`  | Absolute value of real part                                                |
 | `absim(z)`  | Absolute value of imaginary part                                           |
 | `isnan(z)`  | 1 if `z` is NaN, 0 otherwise                                               |
+
+other functions:
+| function     | description                      |
+|--------------|----------------------------------|
+| `mix(u,v,a)` | `u*(1-a) + v*a`                  |
 
 constants:
 | name           | description                                                                                            |

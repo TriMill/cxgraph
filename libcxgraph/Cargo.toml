@@ -1,6 +1,6 @@
 [package]
 name = "libcxgraph"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 build = "build.rs"
 
@@ -12,7 +12,7 @@ log = "0.4"
 lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
 num-complex = "0.4"
 wgpu = "22.1"
-raw-window-handle = "0.6"
+raw-window-handle = "0.6.2"
 unicode-xid = "0.2"
 
 [build-dependencies]

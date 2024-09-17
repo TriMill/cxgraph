@@ -10,7 +10,6 @@ source_text.addEventListener("mousedown", () => { sourceFocused = true; });
 source_text.addEventListener("focusout", () => { sourceFocused = false; });
 
 source_text.addEventListener("keydown", (event) => {
-	console.log(event);
 	if (event.key != "Tab") {
 		sourceFocused = true;
 	}
@@ -159,3 +158,12 @@ source_text.addEventListener("input", (event) => {
 	source_text.selectionEnd = e - amnt;
 });
 
+source_text.addEventListener("change", () => {
+	localStorage.setItem("editor_content", source_text.value);
+});
+
+if (localStorage.getItem("editor_content") !== null) {
+	source_text.value = localStorage.getItem("editor_content");
+} else {
+	source_text.value = "f(z) = 6z^2 - 2i - 1\nplot(z) = f(1 + sin(z)) / 8";
+}

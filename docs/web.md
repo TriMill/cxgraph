@@ -2,7 +2,9 @@
 
 ## Source
 
-Enter the program to plot into the text area. For more information, see [the language docs](language.md).
+Enter the program to plot into the text area. For more information, see [the language docs](language.md). The tab key can be used to add indentation - to use tab to navigate out of the text area, press escape first. Special characters can be inserted with a backslash followed by:
+- a digit 0-9 for a subscript
+- a lowercase or uppercase Greek letter name (eg. `alpha` or `Zeta`) for that letter in the respective case
 
 The Graph button compiles the program and redraws the screen. This must be pressed after changes are made to the program to see them. This can also be accomplished by pressing `Shift`+`Enter` in the text area.
 
@@ -10,7 +12,7 @@ The Redraw button redraws the screen. If Auto Redraw is enabled, the screen will
 
 ## The plot
 
-Most of the screen is occupied by the plot. Click and drag with the mouse to move around, and use the scroll wheel to zoom in and out.
+Most of the screen is occupied by the plot. Click and drag with the mouse to move around, and use the scroll wheel to zoom in and out. Press Ctrl+C while focused on the plot to copy the cursor's position to the clipboard.
 
 ## Options
 
@@ -24,7 +26,7 @@ Contours can be toggled with the contour checkboxes. Real and imaginary contours
 
 Standard coloring directly maps argument to hue in HSV while keeping saturation and value constant. Uniform coloring uses a modified mapping that tries to avoid variation in perceptual brightness. None disables coloring entirely.
 
-Draw Axes and Unit Circle enable or disable the axes and circle overlays.
+The grid can be toggled on and off, or set to show the axes only.
 
 ## Variables
 

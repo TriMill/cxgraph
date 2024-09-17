@@ -81,6 +81,11 @@ pub fn resize(width: u32, height: u32) {
 }
 
 #[wasm_bindgen]
+pub fn set_res_scale(scale: f32) {
+	with_state(|state| state.uniforms.res_scale = scale);
+}
+
+#[wasm_bindgen]
 pub fn set_bounds(min_x: f32, min_y: f32, max_x: f32, max_y: f32) {
 	with_state(|state| {
 		state.uniforms.bounds_min = (min_x, min_y).into();
@@ -107,6 +112,11 @@ pub fn set_coloring(value: u32) {
 #[wasm_bindgen]
 pub fn set_decorations(value: u32) {
 	with_state(|state| state.uniforms.decorations = value);
+}
+
+#[wasm_bindgen]
+pub fn set_grid_mode(value: u32) {
+	with_state(|state| state.uniforms.grid_mode = value);
 }
 
 #[wasm_bindgen]

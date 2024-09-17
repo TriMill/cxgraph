@@ -417,7 +417,7 @@ checksum = "96a6ac251f4a2aca6b3f91340350eab87ae57c3f127ffeb585e92bd336717991"
 
 [[package]]
 name = "cxgraph-web"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -852,7 +852,7 @@ checksum = "d8adc4bb1803a324070e64a98ae98f38934d91957a99cfb3a43dcbc01bc56439"
 
 [[package]]
 name = "libcxgraph"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "lalrpop",
  "lalrpop-util",

@@ -7,10 +7,12 @@ struct Uniforms {
 	resolution: vec2u,
 	bounds_min: vec2f,
 	bounds_max: vec2f,
+	res_scale: f32,
 	shading_intensity: f32,
 	contour_intensity: f32,
 	decoration: u32,
 	coloring: u32,
+	grid_mode: u32,
 }
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
@@ -24,6 +26,7 @@ const E = 2.718281828459045;
 const RECIP_SQRT2 = 0.7071067811865475;
 const LOG_TAU = 1.8378770664093453;
 const LOG_2 = 0.6931471805599453;
+const LOG_10 = 2.302585092994046;
 const RECIP_SQRT29 = 0.18569533817705186;
 
 const C_TAU = vec2f(TAU, 0.0);
@@ -43,11 +46,19 @@ fn remap(val: vec2f, a1: vec2f, b1: vec2f, a2: vec2f, b2: vec2f) -> vec2f {
 	return a2 + (b2 - a2) * ((val - a1) / (b1 - a1));
 }
 
-fn correct_mod(x: f32, y: f32) -> f32 {
+fn screen2cx(pos: vec2f) -> vec2f {
+	return remap(pos, C_ZERO, vec2f(uniforms.resolution), uniforms.bounds_min, uniforms.bounds_max);
+}
+
+fn cx2screen(z: vec2f) -> vec2f {
+	return remap(z, uniforms.bounds_min, uniforms.bounds_max, C_ZERO, vec2f(uniforms.resolution));
+}
+
+fn emod(x: f32, y: f32) -> f32 {
 	return ((x % y) + y) % y;
 }
 
-fn correct_mod2(x: vec2f, y: vec2f) -> vec2f {
+fn emod2(x: vec2f, y: vec2f) -> vec2f {
 	return ((x % y) + y) % y;
 }
 
@@ -151,12 +162,38 @@ fn c_recip(v: vec2f) -> vec2f {
 	return vec2(v.x, -v.y) / dot(v, v);
 }
 
+fn c_diveu(u: vec2f, v: vec2f) -> vec2f {
+	let z = c_div(u, v);
+	return floor(z);
+}
+
+fn c_mod(u: vec2f, v: vec2f) -> vec2f {
+	let z = c_diveu(u, v);
+	return u - c_mul(z, v);
+}
+
+fn c_floor(z: vec2f) -> vec2f { return floor(z); }
+fn c_ceil(z: vec2f) -> vec2f { return ceil(z); }
+fn c_round(z: vec2f) -> vec2f { return round(z); }
+
 fn c_exp(z: vec2f) -> vec2f {
 	return exp(z.x) * vec2(cos(z.y), sin(z.y));
 }
 
 fn c_log(z: vec2f) -> vec2f {
 	return vec2(0.5 * log(dot(z, z)), c_arg(z).x);
+}
+
+fn c_log2(z: vec2f) -> vec2f {
+	return c_log(z)/LOG_2;
+}
+
+fn c_log10(z: vec2f) -> vec2f {
+	return c_log(z)/LOG_10;
+}
+
+fn c_logb(b: vec2f, z: vec2f) -> vec2f {
+	return c_div(c_log(z), c_log(b));
 }
 
 fn c_logbr(z: vec2f, br: vec2f) -> vec2f {
@@ -213,7 +250,7 @@ fn c_tanh(z: vec2f) -> vec2f {
 
 fn c_asin(z: vec2f) -> vec2f {
 	let m = select(-1.0, 1.0, z.y < 0.0 || (z.y == 0.0 && z.x > 0.0));
-	let u = c_sqrt(vec2(1.0, 0.0) - c_mul(z, z));
+	let u = c_sqrt(C_ONE - c_mul(z, z));
 	let v = c_log(u + m*vec2(-z.y, z.x));
 	return m*vec2(v.y, -v.x);
 }
@@ -221,27 +258,27 @@ fn c_asin(z: vec2f) -> vec2f {
 // TODO fix
 fn c_acos(z: vec2f) -> vec2f {
 	let m = select(-1.0, 1.0, z.y < 0.0 || (z.y == 0.0 && z.x > 0.0));
-	let u = c_sqrt(vec2(1.0, 0.0) - c_mul(z, z));
+	let u = c_sqrt(C_ONE - c_mul(z, z));
 	let v = c_log(u + m*vec2(-z.y, z.x));
 	return C_TAU/4.0 + m*vec2(-v.y, v.x);
 }
 
 fn c_atan(z: vec2f) -> vec2f {
-	let u = vec2(1.0, 0.0) - vec2(-z.y, z.x);
-	let v = vec2(1.0, 0.0) + vec2(-z.y, z.x);
+	let u = C_ONE - vec2(-z.y, z.x);
+	let v = C_ONE + vec2(-z.y, z.x);
 	let w = c_log(c_div(u, v));
 	return 0.5 * vec2(-w.y, w.x);
 }
 
 fn c_asinh(z: vec2f) -> vec2f {
 	let m = select(-1.0, 1.0, z.x > 0.0 || (z.x == 0.0 && z.y > 0.0));
-	let u = c_sqrt(vec2(1.0, 0.0) + c_mul(z, z));
+	let u = c_sqrt(C_ONE + c_mul(z, z));
 	return c_log(u + z*m) * m;
 }
 
 fn c_acosh(z: vec2f) -> vec2f {
 	let b = select(0.0, TAU, z.x < 0.0 || (z.x == 0.0 && z.y < 0.0));
-	let u = c_sqrtbr(vec2(-1.0, 0.0) + c_mul(z, z), vec2(b, 0.0));
+	let u = c_sqrtbr(-C_ONE + c_mul(z, z), vec2(b, 0.0));
 	return c_log(u + z);
 }
 
@@ -255,7 +292,7 @@ fn c_loggamma(z: vec2f) -> vec2f {
 	let reflect = z.x < 0.5 && abs(z.y) < 13.0;
 	var zp = z;
 	if reflect {
-		zp = vec2(1.0, 0.0) - z;
+		zp = C_ONE - z;
 	}
 	var w = c_loggamma_inner2(zp);
 	if reflect {
@@ -270,8 +307,8 @@ fn c_loggamma_inner(z: vec2f) -> vec2f {
 }
 
 fn c_loggamma_inner2(z: vec2f) -> vec2f {
-	let w = c_loggamma_inner(z + vec2(3.0, 0.0));
-	let l = c_log(z) + c_log(z + vec2(1.0, 0.0)) + c_log(z + vec2(2.0, 0.0));
+	let w = c_loggamma_inner(z + 3*C_ONE);
+	let l = c_log(z) + c_log(z + C_ONE) + c_log(z + 2*C_ONE);
 	return w - l;
 }
 
@@ -291,7 +328,7 @@ fn c_digamma(z: vec2f) -> vec2f {
 	let reflect = z.x < 0.5 && abs(z.y) < 13.0;
 	var zp = z;
 	if reflect {
-		zp = vec2(1.0, 0.0) - z;
+		zp = C_ONE - z;
 	}
 	var w = c_digamma_inner2(zp);
 	if reflect {
@@ -309,8 +346,8 @@ fn c_digamma_inner(z: vec2f) -> vec2f {
 }
 
 fn c_digamma_inner2(z: vec2f) -> vec2f {
-	let w = c_digamma_inner(z + vec2(3.0, 0.0));
-	let l = c_recip(z + vec2(2.0, 0.0)) + c_recip(z + vec2(1.0, 0.0)) + c_recip(z);
+	let w = c_digamma_inner(z + 3*C_ONE);
+	let l = c_recip(z) + c_recip(z + C_ONE) + c_recip(z + 2*C_ONE);
 	return w - l;
 }
 
@@ -379,13 +416,17 @@ const ERF_A3 = 1.4214137412;
 const ERF_A4 = -1.4531520268;
 const ERF_A5 = 1.0614054292;
 fn c_erf_plus(z: vec2f) -> vec2f {
-	let t = c_recip(vec2(1.0, 0.0) + ERF_P * z);
+	let t = c_recip(C_ONE + ERF_P * z);
 	let m = c_exp(-c_mul(z, z));
 	let r = c_mul(t, vec2f(ERF_A1, 0.0)
 		+ c_mul(t, vec2f(ERF_A2, 0.0)
 			+ c_mul(t, vec2f(ERF_A3, 0.0)
 				+ c_mul(t, vec2f(ERF_A4, 0.0) + t * ERF_A5))));
-	return vec2f(1.0, 0.0) - c_mul(m, r);
+	return C_ONE - c_mul(m, r);
+}
+
+fn c_mix(u: vec2f, v: vec2f, a: vec2f) -> vec2f {
+	return c_mul(u, C_ONE - a) + c_mul(v, a);
 }
 
 /////////////////
@@ -463,43 +504,38 @@ fn coloring_none(z: vec2f) -> vec3f {
 }
 
 fn decoration_contour_re(z: vec2f) -> f32 {
-	return correct_mod(floor(z.x), 2.0) * 2.0 - 1.0;
+	return emod(floor(z.x), 2.0) * 2.0 - 1.0;
 }
 
 fn decoration_contour_im(z: vec2f) -> f32 {
-	return correct_mod(floor(z.y), 2.0) * 2.0 - 1.0;
+	return emod(floor(z.y), 2.0) * 2.0 - 1.0;
 }
 
 fn decoration_contour_arg(z: vec2f) -> f32 {
 	let arg = c_arg(z).x;
-	return round(correct_mod(arg + TAU, TAU/8.0) * 8.0/TAU) * 2.0 - 1.0;
+	return round(emod(arg + TAU, TAU/8.0) * 8.0/TAU) * 2.0 - 1.0;
 }
 
 fn decoration_contour_mag(z: vec2f) -> f32 {
 	let logmag = 0.5 * log2(z.x*z.x + z.y*z.y);
-	return round(correct_mod(0.5 * logmag, 1.0)) * 2.0 - 1.0;
+	return round(emod(0.5 * logmag, 1.0)) * 2.0 - 1.0;
 }
 
-@fragment
-fn main(@builtin(position) in: vec4f) -> @location(0) vec4f {
-	let pos = vec2(in.x, f32(uniforms.resolution.y) - in.y);
-	let w = remap(pos, vec2(0.0, 0.0), vec2f(uniforms.resolution), uniforms.bounds_min, uniforms.bounds_max);
-
-	let z = func_plot(w);
-
-	var col = vec3f();
+fn color_result(z: vec2f) -> vec3f {
 	switch uniforms.coloring {
-		case 0u, default: {
-			col = coloring_standard(z);
+		case 0u: {
+			return coloring_standard(z);
 		}
-		case 1u: {
-			col = coloring_uniform(z);
+		case 1u, default: {
+			return coloring_uniform(z);
 		}
 		case 2u: {
-			col = coloring_none(z);
+			return coloring_none(z);
 		}
 	}
+}
 
+fn contour_result(z: vec2f) -> f32 {
 	var contours = 1.0;
 
 	if (uniforms.decoration & 0x01u) != 0u {
@@ -522,7 +558,62 @@ fn main(@builtin(position) in: vec4f) -> @location(0) vec4f {
 		contours = 0.0;
 	}
 
-	let final_col = mix(col, vec3f(contours * 0.5 + 0.5), uniforms.contour_intensity);
+	return contours;
+}
+
+fn grid_ortho(pos: vec2f) -> f32 {
+	let gt = ceil(uniforms.res_scale);
+	let z0 = screen2cx(pos - vec2f(gt/2));
+	let z1 = screen2cx(pos + vec2f(gt/2));
+
+	let p0 = cx2screen(vec2(0.0, 0.0)) / uniforms.res_scale;
+	let p1 = cx2screen(vec2(1.0, 1.0)) / uniforms.res_scale;
+
+	let gs = 64.0/pow(4.0, floor(-0.5 + log2(p1.x - p0.x)/2));
+	let gs2 = gs/4.0;
+
+	if (emod(z0.x, gs) > emod(z1.x, gs) || emod(z0.y, gs) > emod(z1.y, gs)) {
+		return 0.7;
+	}
+	if (emod(z0.x, gs2) > emod(z1.x, gs2) || emod(z0.y, gs2) > emod(z1.y, gs2)) {
+		return 0.25;
+	}
+	return 0.0;
+}
+
+fn grid_axes(pos: vec2f) -> f32 {
+	let gt = ceil(uniforms.res_scale);
+	let z0 = screen2cx(pos - vec2f(gt/2));
+	let z1 = screen2cx(pos + vec2f(gt/2));
+
+	if ((sign(z0.x) <= 0 && sign(z1.x) > 0) || (sign(z0.y) <= 0 && sign(z1.y) > 0)) {
+		return 0.7;
+	}
+	return 0.0;
+}
+
+@fragment
+fn main(@builtin(position) in: vec4f) -> @location(0) vec4f {
+	let pos = vec2(in.x, f32(uniforms.resolution.y) - in.y);
+	let z = screen2cx(pos);
+
+	let w = func_plot(z);
+
+	let col = color_result(w);
+	let contours = contour_result(w);
+	let plot_col = mix(col, vec3f(contours * 0.5 + 0.5), uniforms.contour_intensity);
+
+	var grid_val = 0.0;
+	switch (uniforms.grid_mode) {
+		case 0u, default {}
+		case 1u {
+			grid_val = grid_axes(pos);
+		}
+		case 2u {
+			grid_val = grid_ortho(pos);
+		}
+	}
+	let final_col = mix(plot_col, vec3(0.0), grid_val);
 
 	return vec4f(pow(final_col, vec3(1.68)), 1.0);
 }

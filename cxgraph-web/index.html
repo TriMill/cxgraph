@@ -10,16 +10,21 @@
 	<meta property="og:title" content="CXGraph">
 	<meta property="og:site_name" content="cx.trimill.xyz">
 
-	<title>CXGraph</title>
-	<link rel="stylesheet" href="style.css">
+	<link rel="icon" type="image/png" sizes="16x16" href="/static/icon/favicon16.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/static/icon/favicon32.png">
+	<link rel="icon" type="image/png" sizes="48x48" href="/static/icon/favicon48.png">
+	<link rel="icon" type="image/png" sizes="64x64" href="/static/icon/favicon64.png">
+	<link rel="icon" type="image/png" sizes="160x160" href="/static/icon/favicon160.png">
+	<link rel="icon" type="image/png" sizes="320x320" href="/static/icon/favicon320.png">
+	<link rel="icon" type="image/png" sizes="640x640" href="/static/icon/favicon640.png">
+
+	<title>cxgraph</title>
+	<link rel="stylesheet" href="static/style.css">
 </head>
-<body>
+<body id="body" class="theme_dark">
 	<div class="canvas-container">
 		<canvas id="canvas"></canvas>
 		<svg id="overlay">
-			<line id="svg_axis_x" x1="0" y1="0" x2="0" y2="0" stroke="#0006" stroke-width="1.5" visibility="hidden" />
-			<line id="svg_axis_y" x1="0" y1="0" x2="0" y2="0" stroke="#0006" stroke-width="1.5" visibility="hidden" />
-			<circle id="svg_unitcircle" cx="0" cy="0" r="0" stroke="#0006" fill="none" stroke-width="1.5" visibility="hidden" />
 			<g id="svg_point_template" visibility="hidden">
 				<circle cx="0" cy="0" r="15" stroke="none" fill="#3337" />
 				<circle cx="0" cy="0" r="5" stroke="none" fill="#dddc" />
@@ -41,7 +46,12 @@
 			</div>
 
 			<div id="div_error_msg" hidden></div>
-			<div><textarea id="source_text">f(z) = 6z^2 - 2i - 1&#10;plot(z) = f(1 + sin(z)) / 8</textarea></div>
+			<div><textarea id="source_text" spellcheck="false" title="Source text"></textarea></div>
+
+			<div>
+				<input type="checkbox" id="checkbox_theme" checked>
+				<label for="checkbox_theme">Dark theme</label>
+			</div>
 		</details>
 
 		<div>
@@ -51,107 +61,106 @@
 				<input type="button" id="button_reset_view" value="Reset view">
 				<input type="button" id="button_help" value="Help" onclick="window.open('https://g.trimill.xyz/trimill/cxgraph')">
 			</div>
-			<div>
-				<div><label for="range_resolution">Resolution</label></div>
+			<div><fieldset>
+				<legend><label for="range_resolution">Resolution</label></legend>
 				<input type="range" id="range_resolution" name="resolution" min="-2" max="2" step="1" value="0">
-			</div>
+			</fieldset></div>
 
-			<div>
-				<div><label for="range_shading">Shading intensity</label></div>
+			<div><fieldset>
+				<legend><label for="range_shading">Shading intensity</label></legend>
 				<input type="range" id="range_shading" min="0" max="1" step="0.01" value="0.3">
-			</div>
+			</fieldset></div>
 
-			<div>
+			<div><fieldset>
+				<legend>Contours</legend>
+				<div>
+					<input type="range" id="range_contour" min="0" max="1" step="0.01" value="0.0" title="Contour intensity">
+				</div>
 				<div>
 					<input type="checkbox" class="decor" id="checkbox_decor_1" data-value="1">
-					<label for="checkbox_decor_1">Real contours</label>
+					<label for="checkbox_decor_1">Real</label>
 				</div>
-
 				<div>
 					<input type="checkbox" class="decor" id="checkbox_decor_2" data-value="2">
-					<label for="checkbox_decor_2">Imaginary contours</label>
+					<label for="checkbox_decor_2">Imaginary</label>
 				</div>
-
 				<div>
 					<input type="checkbox" class="decor" id="checkbox_decor_4" data-value="4">
-					<label for="checkbox_decor_4">Argument contours</label>
+					<label for="checkbox_decor_4">Argument</label>
 				</div>
-
 				<div>
 					<input type="checkbox" class="decor" id="checkbox_decor_8" data-value="8">
-					<label for="checkbox_decor_8">Magnitude contours</label>
+					<label for="checkbox_decor_8">Magnitude</label>
 				</div>
+			</fieldset></div>
 
-				<div>
-					<div><label for="range_contour">Contour intensity</label></div>
-					<input type="range" id="range_contour" min="0" max="1" step="0.01" value="0.0">
-				</div>
-			</div>
-
-			<div>
-				<div>Coloring</div>
+			<div><fieldset>
+				<legend>Coloring</legend>
 				<input type="radio" name="color_mode" id="radio_color_0" data-value="0">
 				<label for="radio_color_0">Standard</label><br>
 				<input type="radio" name="color_mode" id="radio_color_1" data-value="1">
 				<label for="radio_color_1">Uniform</label><br>
 				<input type="radio" name="color_mode" id="radio_color_2" data-value="2">
 				<label for="radio_color_2">None</label>
-			</div>
+			</fieldset></div>
 
-			<div>
-				Overlay
-				<div>
-					<input type="checkbox" id="overlay_axes">
-					<label for="overlay_axes">Draw axes</label>
-				</div>
-				<div>
-					<input type="checkbox" id="overlay_unitcircle">
-					<label for="overlay_unitcircle">Draw unit circle</label>
-				</div>
-			</div>
+			<div><fieldset>
+				<legend>Grid</legend>
+				<input type="radio" name="grid_mode" id="radio_grid_0" data-value="0">
+				<label for="radio_grid_0">None</label><br>
+				<input type="radio" name="grid_mode" id="radio_grid_1" data-value="1">
+				<label for="radio_grid_1">Axes</label><br>
+				<input type="radio" name="grid_mode" id="radio_grid_2" data-value="2">
+				<label for="radio_grid_2">Cartesian</label>
+			</fieldset></div>
 		</details>
 
 		<details class="menu" open>
 			<summary>Variables</summary>
 			<div id="slider_template" hidden>
 				<div>
-					<input type="text" class="var-name" style="width: 5ch;" placeholder="a">
+					<input type="button" class="var-delete" value="X" title="Delete">
+					<input type="text" class="var-name" style="width: 5ch;" placeholder="a" title="Variable name">
 					=
-					<input type="number" class="var-value" style="width: 10ch;" value="0" required>
-					<input type="button" class="var-delete" value="X">
+					<input type="number" class="var-value" style="width: 10ch;" value="0" required title="Value">
 				</div>
 				<div>
-					<input type="range" class="var-slider" min="-1" max="1" step="0.01" value="0">
+					<input type="range" class="var-slider" min="-1" max="1" step="0.01" value="0" title="Slider">
 				</div>
 				<div style="display: flex; flex-direction: row; justify-content: space-between;">
-					<input type="number" class="var-min"  style="width: 6ch;" required value="-1">
-					<input type="number" class="var-step" style="width: 6ch;" required value="0.01">
-					<input type="number" class="var-max"  style="width: 6ch;" required value="1">
+					<input type="number" class="var-bounds var-min"  style="width: 6ch;" required value="-1" title="Minimum">
+					<input type="number" class="var-bounds var-max"  style="width: 6ch;" required value="1" title="Maximum">
+					<input type="number" class="var-bounds var-step" style="width: 6ch;" required value="0.01" title="Step">
 				</div>
 				<hr>
 			</div>
 			<div id="point_template" hidden>
-				<input type="text" class="var-name" style="width: 5ch;" placeholder="b">
+				<input type="button" class="var-delete" value="X" title="Delete">
+				<input type="text" class="var-name" style="width: 5ch;" placeholder="b" title="Variable name">
 				=
-				<input type="number" class="var-value-re" style="width: 8ch;" required value="0">
+				<input type="number" class="var-value-re" style="width: 8ch;" required value="0" title="Real part">
 				+
-				<input type="number" class="var-value-im" style="width: 8ch;" required value="0">i
-				<input type="button" class="var-delete" value="X">
+				<input type="number" class="var-value-im" style="width: 8ch;" required value="0" title="Imaginary part">i
 				<hr>
 			</div>
 			<div id="div_variables"></div>
 			<div id="buttons_var_new">
-				<input type="button" id="button_slider_new" value="+slider">
-				<input type="button" id="button_point_new" value="+point">
+				<input type="button" id="button_slider_new" value="+slider" title="Add slider">
+				<input type="button" id="button_point_new" value="+point" title="Add point">
 			</div>
 		</details>
 		</div>
 	</div>
 
+	<div class="info_overlay">
+		<span id="mouse_pos"></span>
+	</div>
+
 	<script>
 		window.modules = {};
-		import('./index.js').then(m => window.modules.index = m);
-		import('./editor.js').then(m => window.modules.editor = m);
+		import('./static/index.js').then(m => window.modules.index = m);
+		import('./static/editor.js').then(m => window.modules.editor = m);
+		import('./static/themes.js').then(m => window.modules.themes = m);
 	</script>
 </body>
 </html>

@@ -4,7 +4,7 @@ use lalrpop_util::lalrpop_mod;
 
 use crate::language::token::Lexer;
 
-use self::{compiler::Compiler, ast::display_def};
+use self::{ast::display_def, compiler::Compiler, token::{LexerError, Token}};
 
 mod token;
 mod ast;
@@ -25,6 +25,10 @@ pub fn compile(src: &str, vars: &HashMap<String, usize>) -> Result<String, Box<d
 	}
 	cmp.ensure_plot_defined()?;
 	Ok(wgsl)
+}
+
+pub fn tokens(src: &str) -> Result<Vec<(usize, Token, usize)>, LexerError> {
+	Lexer::new(src).collect()
 }
 
 pub fn show_ast(src: &str) -> Result<String, Box<dyn std::error::Error>> {

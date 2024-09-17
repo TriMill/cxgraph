@@ -1,6 +1,6 @@
 "use strict"
 
-import init, * as cxgraph from "./pkg/cxgraph_web.js";
+import init, * as cxgraph from "../pkg/cxgraph_web.js";
 await init();
 
 let graphView = {
@@ -38,6 +38,11 @@ function screenToCx(screen) {
 	}
 }
 
+function panView(dX, dY) {
+	graphView.xoff -= 2.0 * graphView.scale * dX / window.innerHeight;
+	graphView.yoff += 2.0 * graphView.scale * dY / window.innerHeight;
+}
+
 //
 // Canvas
 //
@@ -65,29 +70,8 @@ function calcBounds() {
 }
 
 function onViewChange() {
-	let dim = { w: window.innerWidth, h: innerHeight };
 	let bounds = calcBounds();
 	cxgraph.set_bounds(bounds.x_min, bounds.y_min, bounds.x_max, bounds.y_max);
-	let origin = cxToScreen({ re: 0, im: 0 });
-	let one = cxToScreen({ re: 1, im: 0 });
-
-	if(svg_axis_x.visibility != "hidden") {
-		svg_axis_x.setAttribute("x1", 0)
-		svg_axis_x.setAttribute("x2", dim.w);
-		svg_axis_x.setAttribute("y1", origin.y);
-		svg_axis_x.setAttribute("y2", origin.y);
-	}
-	if(svg_axis_y.visibility != "hidden") {
-		svg_axis_y.setAttribute("x1", origin.x);
-		svg_axis_y.setAttribute("x2", origin.x);
-		svg_axis_y.setAttribute("y1", 0);
-		svg_axis_y.setAttribute("y2", dim.h);
-	}
-	if(svg_unitcircle.visibility != "hidden") {
-		svg_unitcircle.setAttribute("cx", origin.x);
-		svg_unitcircle.setAttribute("cy", origin.y);
-		svg_unitcircle.setAttribute("r", one.x - origin.x);
-	}
 
 	for(let point of graphPoints) {
 		point.onViewChange();
@@ -96,18 +80,34 @@ function onViewChange() {
 	tryRedraw();
 }
 
+function updateCoordinates() {
+	let cx = screenToCx({ x: mouseX, y: mouseY });
+	let scale = -Math.floor(Math.log10(graphView.scale * 0.001));
+	if (scale < 0) scale = 0;
+	let re = cx.re.toFixed(scale);
+	let im = (-cx.im).toFixed(scale);
+	mouse_pos.textContent = `${re} + ${im}i`;
+}
+
 function onResize() {
 	let width = window.innerWidth;
 	let height = window.innerHeight;
 	cxgraph.resize(width*graphView.res_mult, height*graphView.res_mult);
+	cxgraph.set_res_scale(graphView.res_mult);
 	canvas.style.width = "100vw";
 	canvas.style.height = "100vh";
 	onViewChange();
+	updateCoordinates();
 }
 
 function onWheel(e) {
-	graphView.scale *= Math.exp(e.deltaY * 0.0007);
+	let factor = Math.exp(e.deltaY * 0.0007);
+	let dX = window.innerWidth/2 - e.x;
+	let dY = window.innerHeight/2 - e.y;
+	panView(dX * (1 - factor), dY * (1 - factor));
+	graphView.scale *= factor
 	onViewChange();
+	updateCoordinates();
 }
 
 function onPointerDown(e) {
@@ -124,18 +124,24 @@ function onPointerUp() {
 }
 
 function onPointerMove(e) {
+	let dX = e.offsetX - mouseX;
+	let dY = e.offsetY - mouseY;
+	mouseX = e.offsetX;
+	mouseY = e.offsetY;
 	if(mousePressed) {
-		let dX = e.offsetX - mouseX;
-		let dY = e.offsetY - mouseY;
-		mouseX = e.offsetX;
-		mouseY = e.offsetY;
-		graphView.xoff -= 2.0 * graphView.scale * dX / window.innerHeight;
-		graphView.yoff += 2.0 * graphView.scale * dY / window.innerHeight;
+		panView(dX, dY);
 		onViewChange();
 	} else {
 		for(let point of graphPoints) {
 			point.onPointerMove(e);
 		}
+	}
+	updateCoordinates();
+}
+
+function onKeyDown(e) {
+	if (e.key == "c" && e.ctrlKey) {
+		navigator.clipboard.writeText(mouse_pos.textContent);
 	}
 }
 
@@ -144,6 +150,8 @@ canvas.addEventListener("wheel", onWheel);
 canvas.addEventListener("pointerdown", onPointerDown);
 canvas.addEventListener("pointerup", onPointerUp);
 canvas.addEventListener("pointermove", onPointerMove);
+canvas.addEventListener("pointermove", onPointerMove);
+canvas.addEventListener("keydown", onKeyDown);
 
 //
 // Graph/redraw
@@ -220,16 +228,18 @@ for(let e of nameColorMode) {
 nameColorMode[1].checked = true;
 cxgraph.set_coloring(1);
 
-overlay_axes.addEventListener("change", () => {
-	let vis = overlay_axes.checked ? "visible" : "hidden";
-	svg_axis_x.setAttribute("visibility", vis);
-	svg_axis_y.setAttribute("visibility", vis);
-});
+let nameGridMode = document.getElementsByName("grid_mode");
+for(let e of nameGridMode) {
+	e.addEventListener("change", () => {
+		let selected = document.querySelector("input[name=grid_mode]:checked");
+		cxgraph.set_grid_mode(parseInt(selected.getAttribute("data-value")));
+		tryRedraw();
+	});
+	e.checked = false;
+}
+nameGridMode[2].checked = true;
+cxgraph.set_grid_mode(2);
 
-overlay_unitcircle.addEventListener("change", () => {
-	let vis = overlay_unitcircle.checked ? "visible" : "hidden";
-	svg_unitcircle.setAttribute("visibility", vis);
-});
 
 //
 // Variables
@@ -403,6 +413,7 @@ function addPoint() {
 
 button_slider_new.addEventListener("click", addSlider);
 button_point_new.addEventListener("click", addPoint);
+
 
 //
 // Init

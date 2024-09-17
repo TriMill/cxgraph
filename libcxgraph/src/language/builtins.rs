@@ -21,6 +21,11 @@ thread_local! {
 		m.insert("abs",    ("c_abs",    1));
 		m.insert("arg",    ("c_arg",    1));
 		m.insert("argbr",  ("c_argbr",  2));
+		m.insert("diveu",  ("c_diveu",  2));
+		m.insert("mod",    ("c_mod",    2));
+		m.insert("floor",  ("c_floor",  1));
+		m.insert("ceil",   ("c_ceil",   1));
+		m.insert("round",  ("c_round",  1));
 
 		m.insert("add",   ("c_add",   2));
 		m.insert("sub",   ("c_sub",   2));
@@ -31,6 +36,9 @@ thread_local! {
 
 		m.insert("exp",    ("c_exp",    1));
 		m.insert("log",    ("c_log",    1));
+		m.insert("log2",   ("c_log2",   1));
+		m.insert("log10",  ("c_log10",  1));
+		m.insert("logb",   ("c_logb",   2));
 		m.insert("logbr",  ("c_logbr",  2));
 		m.insert("sqrt",   ("c_sqrt",   1));
 		m.insert("sqrtbr", ("c_sqrtbr", 2));
@@ -61,6 +69,8 @@ thread_local! {
 		m.insert("lambertw",    ("c_lambertw",   1));
 		m.insert("lambertwbr",  ("c_lambertwbr", 2));
 		m.insert("erf",         ("c_erf",        1));
+
+		m.insert("mix", ("c_mix", 3));
 
 		m
 	};
